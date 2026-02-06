@@ -8,12 +8,36 @@ interface DrawCanvasProps {
   onComplete: (glyphImages: Record<string, Blob>) => void;
 }
 
+const THICKNESS_OPTIONS = [
+  { label: "S", value: 2 },
+  { label: "M", value: 4 },
+  { label: "L", value: 8 },
+  { label: "XL", value: 14 },
+] as const;
+
+const OPACITY_OPTIONS = [
+  { label: "light", value: 0.08 },
+  { label: "medium", value: 0.3 },
+  { label: "full", value: 1 },
+] as const;
+
+const TIP_OPTIONS = [
+  { label: "round", value: "round" as CanvasLineCap },
+  { label: "flat", value: "square" as CanvasLineCap },
+] as const;
+
 export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [drawnGlyphs, setDrawnGlyphs] = useState<Record<string, Blob>>({});
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasContent, setHasContent] = useState(false);
+
+  // Brush settings
+  const [thickness, setThickness] = useState(4);
+  const [opacity, setOpacity] = useState(1);
+  const [tip, setTip] = useState<CanvasLineCap>("round");
+  const [showSettings, setShowSettings] = useState(false);
 
   const currentLetter = ALL_LETTERS[currentIndex];
   const progress = Object.keys(drawnGlyphs).length / ALL_LETTERS.length;
@@ -79,10 +103,10 @@ export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
     const { x, y } = getPos(e);
     ctx.beginPath();
     ctx.moveTo(x, y);
-    ctx.strokeStyle = "#1a1a1a";
-    ctx.lineWidth = 4;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
+    ctx.strokeStyle = `rgba(26, 26, 26, ${opacity})`;
+    ctx.lineWidth = thickness;
+    ctx.lineCap = tip;
+    ctx.lineJoin = tip === "round" ? "round" : "miter";
   };
 
   const draw = (e: React.TouchEvent | React.MouseEvent) => {
@@ -219,6 +243,109 @@ export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
             </span>
           </div>
         )}
+      </div>
+
+      {/* Brush settings toggle + panel */}
+      <div className="w-full flex flex-col items-center gap-3" style={{ maxWidth: "320px" }}>
+        <button
+          onClick={() => setShowSettings(!showSettings)}
+          className="text-[10px] uppercase tracking-[0.2em] text-fg/30 hover:text-fg/60 transition-colors flex items-center gap-1.5"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
+          </svg>
+          brush{showSettings ? "" : " settings"}
+        </button>
+
+        <AnimatePresence>
+          {showSettings && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ type: "spring", stiffness: 500, damping: 35 }}
+              className="w-full overflow-hidden"
+            >
+              <div className="flex flex-col gap-4 py-3 px-4 rounded-xl border border-border bg-white/60"
+                style={{ boxShadow: "var(--shadow-sm)" }}
+              >
+                {/* Thickness */}
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase tracking-[0.2em] text-fg/40">
+                    thickness
+                  </span>
+                  <div className="flex items-center gap-2">
+                    {THICKNESS_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        onClick={() => setThickness(opt.value)}
+                        className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
+                          thickness === opt.value
+                            ? "bg-fg text-bg"
+                            : "bg-transparent text-fg/35 hover:text-fg/60"
+                        }`}
+                        title={opt.label}
+                      >
+                        <span
+                          className="block rounded-full bg-current"
+                          style={{
+                            width: `${Math.max(opt.value * 1.2, 3)}px`,
+                            height: `${Math.max(opt.value * 1.2, 3)}px`,
+                          }}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Opacity */}
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase tracking-[0.2em] text-fg/40">
+                    opacity
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {OPACITY_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        onClick={() => setOpacity(opt.value)}
+                        className={`px-2.5 py-1 rounded-full text-[10px] tracking-wide transition-all ${
+                          opacity === opt.value
+                            ? "bg-fg text-bg"
+                            : "text-fg/35 hover:text-fg/60"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Tip style */}
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase tracking-[0.2em] text-fg/40">
+                    tip
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {TIP_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        onClick={() => setTip(opt.value)}
+                        className={`px-2.5 py-1 rounded-full text-[10px] tracking-wide transition-all ${
+                          tip === opt.value
+                            ? "bg-fg text-bg"
+                            : "text-fg/35 hover:text-fg/60"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Controls */}
