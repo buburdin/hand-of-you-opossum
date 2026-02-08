@@ -8,6 +8,7 @@ import DrawCanvas from "@/components/DrawCanvas";
 import ProcessingAnimation from "@/components/ProcessingAnimation";
 import TextPlayground from "@/components/TextPlayground";
 import FontExport, { exportElementAsImage } from "@/components/FontExport";
+import ThemeToggle from "@/components/ThemeToggle";
 import { processPangram, processDrawnGlyphs, FontResult } from "@/lib/api";
 import { loadFont } from "@/lib/fontLoader";
 
@@ -111,14 +112,17 @@ export default function Home() {
         >
           hand of you
         </button>
-        {step !== "landing" && (
-          <button
-            onClick={handleStartOver}
-            className="text-[10px] uppercase tracking-[0.2em] text-fg/35 hover:text-fg/60 transition-colors"
-          >
-            start over
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {step !== "landing" && (
+            <button
+              onClick={handleStartOver}
+              className="text-[10px] uppercase tracking-[0.2em] text-fg/35 hover:text-fg/60 transition-colors"
+            >
+              start over
+            </button>
+          )}
+          <ThemeToggle />
+        </div>
       </header>
 
       {/* Main content */}

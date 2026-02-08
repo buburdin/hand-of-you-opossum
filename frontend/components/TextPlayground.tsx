@@ -42,8 +42,12 @@ export default function TextPlayground({
       {/* Text display area */}
       <div
         ref={textDisplayRef}
-        className="w-full min-h-[200px] p-8 rounded-xl border border-border bg-white"
-        style={{ boxShadow: "var(--shadow-md)" }}
+        className={`w-full aspect-square p-8 rounded-none border ${
+          fontLoaded ? "sticky-note" : "border-border bg-surface"
+        }`}
+        style={{
+          boxShadow: fontLoaded ? "var(--shadow-sticky)" : "var(--shadow-md)",
+        }}
       >
         <div
           className="font-preview break-words"
@@ -54,7 +58,9 @@ export default function TextPlayground({
           }}
         >
           {text || (
-            <span className="text-fg/20">start typing...</span>
+            <span className={fontLoaded ? "text-ink/20" : "text-fg/20"}>
+              start typing...
+            </span>
           )}
         </div>
       </div>

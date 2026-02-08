@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getRandomPangram } from "@/lib/pangrams";
+import CameraCapture from "@/components/CameraCapture";
 
 interface PangramCaptureProps {
   onCapture: (file: File | Blob, pangram: string) => void;
@@ -11,8 +12,8 @@ interface PangramCaptureProps {
 export default function PangramCapture({ onCapture }: PangramCaptureProps) {
   const [pangram, setPangram] = useState(() => getRandomPangram());
   const [preview, setPreview] = useState<string | null>(null);
+  const [cameraActive, setCameraActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const shufflePangram = () => {
     let next = getRandomPangram();
@@ -24,12 +25,20 @@ export default function PangramCapture({ onCapture }: PangramCaptureProps) {
 
   const handleFile = useCallback(
     (file: File) => {
+      if (preview) URL.revokeObjectURL(preview);
       const url = URL.createObjectURL(file);
       setPreview(url);
       onCapture(file, pangram);
     },
-    [onCapture, pangram]
+    [onCapture, pangram, preview]
   );
+
+  // Cleanup preview URL on unmount
+  useEffect(() => {
+    return () => {
+      if (preview) URL.revokeObjectURL(preview);
+    };
+  }, [preview]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -42,6 +51,22 @@ export default function PangramCapture({ onCapture }: PangramCaptureProps) {
     if (file && file.type.startsWith("image/")) {
       handleFile(file);
     }
+  };
+
+  const handleCameraCapture = useCallback(
+    (file: File) => {
+      setCameraActive(false);
+      handleFile(file);
+    },
+    [handleFile]
+  );
+
+  const handleTakePhoto = () => {
+    setCameraActive(true);
+  };
+
+  const handleCameraClose = () => {
+    setCameraActive(false);
   };
 
   return (
@@ -75,7 +100,13 @@ export default function PangramCapture({ onCapture }: PangramCaptureProps) {
 
       {/* Capture area */}
       <AnimatePresence mode="wait">
-        {preview ? (
+        {cameraActive ? (
+          <CameraCapture
+            key="camera"
+            onCapture={handleCameraCapture}
+            onClose={handleCameraClose}
+          />
+        ) : preview ? (
           <motion.div
             key="preview"
             initial={{ opacity: 0, scale: 0.95 }}
@@ -130,7 +161,7 @@ export default function PangramCapture({ onCapture }: PangramCaptureProps) {
                 tap to upload or take a photo
               </p>
               <p className="text-[10px] text-fg/30">
-                or drag & drop an image
+                or drag &amp; drop an image
               </p>
             </div>
           </motion.div>
@@ -145,20 +176,12 @@ export default function PangramCapture({ onCapture }: PangramCaptureProps) {
         className="hidden"
         onChange={handleInputChange}
       />
-      <input
-        ref={cameraInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        onChange={handleInputChange}
-      />
 
       {/* Action buttons */}
-      {!preview && (
+      {!preview && !cameraActive && (
         <div className="flex gap-3">
           <button
-            onClick={() => cameraInputRef.current?.click()}
+            onClick={handleTakePhoto}
             className="px-5 py-2.5 rounded-full border border-border text-xs tracking-wide hover:border-fg/30 transition-colors"
             style={{ boxShadow: "var(--shadow-sm)" }}
           >
