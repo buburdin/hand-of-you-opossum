@@ -1,16 +1,71 @@
 @import "tailwindcss";
 
-:root {
+:root,
+html[data-theme="light"] {
   --bg: #fafaf8;
   --fg: #1a1a1a;
   --accent: #ff6b35;
   --border: rgba(26, 26, 26, 0.1);
   --border-strong: rgba(26, 26, 26, 0.2);
+  --surface: #ffffff;
+  --paper: #ffffff;
+  --ink: #1a1a1a;
   --shadow-sm: 0 1px 2px rgba(26, 26, 26, 0.04);
   --shadow-md: 0 2px 8px rgba(26, 26, 26, 0.06);
   --shadow-lg: 0 4px 16px rgba(26, 26, 26, 0.08);
+  --shadow-sticky: 0 10px 24px rgba(26, 26, 26, 0.16),
+    0 1px 0 rgba(255, 255, 255, 0.7) inset;
+  --sticky-bg: #fff3a2;
+  --sticky-highlight: #ffed88;
+  --sticky-bg-2: #ffe277;
+  --sticky-border: rgba(26, 26, 26, 0.12);
   --radius: 10px;
   --radius-lg: 16px;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --bg: #0f1113;
+    --fg: #f4f1ec;
+    --accent: #ff8a4c;
+    --border: rgba(244, 241, 236, 0.12);
+    --border-strong: rgba(244, 241, 236, 0.2);
+    --surface: #171a1c;
+    --paper: #ffffff;
+    --ink: #1a1a1a;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
+    --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 10px 28px rgba(0, 0, 0, 0.6);
+    --shadow-sticky: 0 12px 28px rgba(0, 0, 0, 0.6),
+      0 1px 0 rgba(255, 255, 255, 0.06) inset;
+    --sticky-bg: #4a3f1f;
+    --sticky-highlight: #6a5825;
+    --sticky-bg-2: #5a4a22;
+    --sticky-border: rgba(255, 227, 119, 0.25);
+    color-scheme: dark;
+  }
+}
+
+html[data-theme="night"] {
+  --bg: #0f1113;
+  --fg: #f4f1ec;
+  --accent: #ff8a4c;
+  --border: rgba(244, 241, 236, 0.12);
+  --border-strong: rgba(244, 241, 236, 0.2);
+  --surface: #171a1c;
+  --paper: #ffffff;
+  --ink: #1a1a1a;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 10px 28px rgba(0, 0, 0, 0.6);
+  --shadow-sticky: 0 12px 28px rgba(0, 0, 0, 0.6),
+    0 1px 0 rgba(255, 255, 255, 0.06) inset;
+  --sticky-bg: #4a3f1f;
+  --sticky-highlight: #6a5825;
+  --sticky-bg-2: #5a4a22;
+  --sticky-border: rgba(255, 227, 119, 0.25);
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -19,6 +74,9 @@
   --color-accent: var(--accent);
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
+  --color-surface: var(--surface);
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
   --font-mono: "JetBrains Mono", "SF Mono", "Fira Code", ui-monospace, monospace;
 }
 
@@ -27,12 +85,13 @@
 }
 
 body {
-  background: var(--bg);
+  background-color: var(--bg);
   color: var(--fg);
   font-family: var(--font-mono);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overscroll-behavior: none;
+  transition: background-color 200ms ease, color 200ms ease;
 }
 
 /* Custom scrollbar - minimal */
@@ -57,6 +116,18 @@ body {
 .font-preview {
   font-family: "UserHandwriting", sans-serif;
   line-height: 1.4;
+}
+
+/* Sticky note styling for font preview */
+.sticky-note {
+  background: linear-gradient(
+    135deg,
+    var(--sticky-bg) 0%,
+    var(--sticky-highlight) 60%,
+    var(--sticky-bg-2) 100%
+  );
+  border-color: var(--sticky-border);
+  color: var(--ink);
 }
 
 /* Subtle focus ring */

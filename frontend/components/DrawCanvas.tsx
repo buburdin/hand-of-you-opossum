@@ -221,7 +221,7 @@ export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
 
       {/* Drawing canvas */}
       <div
-        className="drawing-canvas w-full aspect-square rounded-xl border border-border bg-white relative overflow-hidden"
+        className="drawing-canvas w-full aspect-square rounded-xl border border-border bg-paper relative overflow-hidden"
         style={{ boxShadow: "var(--shadow-md)", maxWidth: "320px" }}
       >
         <canvas
@@ -238,7 +238,7 @@ export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
         {/* Guide letter (faint) */}
         {!hasContent && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <span className="text-8xl text-fg/[0.04] font-medium select-none">
+            <span className="text-8xl text-ink/[0.04] font-medium select-none">
               {currentLetter}
             </span>
           </div>
@@ -267,7 +267,7 @@ export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
               transition={{ type: "spring", stiffness: 500, damping: 35 }}
               className="w-full overflow-hidden"
             >
-              <div className="flex flex-col gap-4 py-3 px-4 rounded-xl border border-border bg-white/60"
+              <div className="flex flex-col gap-4 py-3 px-4 rounded-xl border border-border bg-surface/60"
                 style={{ boxShadow: "var(--shadow-sm)" }}
               >
                 {/* Thickness */}
