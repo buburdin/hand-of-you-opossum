@@ -3,6 +3,7 @@
 import { useRef, useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ALL_LETTERS } from "@/lib/pangrams";
+import { spring, springSnappy } from "@/lib/motion";
 
 interface DrawCanvasProps {
   onComplete: (glyphImages: Record<string, Blob>) => void;
@@ -131,11 +132,11 @@ export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
     const canvas = canvasRef.current;
     if (!canvas || !hasContent) return;
 
-    const blob = await new Promise<Blob>((resolve) => {
-      canvas.toBlob(
-        (b) => resolve(b!),
-        "image/png"
-      );
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((b) => {
+        if (b) resolve(b);
+        else reject(new Error("Failed to export canvas"));
+      }, "image/png");
     });
 
     const newGlyphs = { ...drawnGlyphs, [currentLetter]: blob };
@@ -174,7 +175,7 @@ export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
-      transition={{ type: "spring", stiffness: 400, damping: 30 }}
+      transition={spring}
       className="flex flex-col items-center gap-6 w-full max-w-lg mx-auto"
     >
       {/* Progress bar */}
@@ -195,7 +196,7 @@ export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
             className="h-full bg-fg/60 rounded-full"
             initial={{ width: 0 }}
             animate={{ width: `${progress * 100}%` }}
-            transition={{ type: "spring", stiffness: 400, damping: 30 }}
+            transition={spring}
           />
         </div>
       </div>
@@ -208,7 +209,7 @@ export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
             initial={{ opacity: 0, y: 8, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.95 }}
-            transition={{ type: "spring", stiffness: 500, damping: 30 }}
+            transition={springSnappy}
             className="text-6xl font-medium mb-1"
           >
             {currentLetter}
@@ -264,7 +265,7 @@ export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
-              transition={{ type: "spring", stiffness: 500, damping: 35 }}
+              transition={springSnappy}
               className="w-full overflow-hidden"
             >
               <div className="flex flex-col gap-4 py-3 px-4 rounded-xl border border-border bg-surface/60"

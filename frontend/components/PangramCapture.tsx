@@ -4,6 +4,7 @@ import { useRef, useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getRandomPangram } from "@/lib/pangrams";
 import CameraCapture from "@/components/CameraCapture";
+import { spring } from "@/lib/motion";
 
 interface PangramCaptureProps {
   onCapture: (file: File | Blob, pangram: string) => void;
@@ -74,7 +75,7 @@ export default function PangramCapture({ onCapture }: PangramCaptureProps) {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
-      transition={{ type: "spring", stiffness: 400, damping: 30 }}
+      transition={spring}
       className="flex flex-col items-center gap-8 w-full max-w-lg mx-auto"
     >
       {/* Pangram display */}

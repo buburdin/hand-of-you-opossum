@@ -2,7 +2,6 @@ const FONT_FAMILY_NAME = "UserHandwriting";
 
 let currentFontUrl: string | null = null;
 let currentFontDataUrl: string | null = null;
-let currentFontFormat: "truetype" | "woff2" = "truetype";
 
 /**
  * Convert an ArrayBuffer to a base64 data URL.
@@ -16,28 +15,9 @@ function arrayBufferToDataUrl(buffer: ArrayBuffer, mimeType: string): string {
   return `data:${mimeType};base64,${btoa(binary)}`;
 }
 
-type FontFormat = "truetype" | "woff2";
-
 /**
- * Detect font format from an ArrayBuffer by checking the magic bytes.
- * - OTF/TTF starts with 0x00010000 or 'OTTO'
- * - WOFF2 starts with 'wOF2'
- */
-function detectFontFormat(buffer: ArrayBuffer): FontFormat {
-  const view = new DataView(buffer);
-  if (buffer.byteLength < 4) return "truetype";
-
-  const magic = view.getUint32(0);
-  // wOF2 = 0x774F4632
-  if (magic === 0x774f4632) return "woff2";
-  return "truetype";
-}
-
-/**
- * Load a font from an ArrayBuffer (TTF, OTF, or WOFF2) into the browser,
+ * Load a font from an ArrayBuffer (TTF/OTF) into the browser,
  * making it available for use via CSS font-family.
- *
- * Auto-detects the format from the buffer contents.
  */
 export async function loadFont(fontBuffer: ArrayBuffer): Promise<string> {
   // Clean up previous font URL
@@ -52,11 +32,7 @@ export async function loadFont(fontBuffer: ArrayBuffer): Promise<string> {
     }
   }
 
-  // Detect format
-  const format = detectFontFormat(fontBuffer);
-  currentFontFormat = format;
-
-  const mimeType = format === "woff2" ? "font/woff2" : "font/sfnt";
+  const mimeType = "font/sfnt";
 
   // Store as base64 data URL for image export (html-to-image can't access blob: URLs)
   currentFontDataUrl = arrayBufferToDataUrl(fontBuffer, mimeType);
@@ -72,6 +48,24 @@ export async function loadFont(fontBuffer: ArrayBuffer): Promise<string> {
   return FONT_FAMILY_NAME;
 }
 
+/**
+ * Unload the current font and clean up resources.
+ * Call this when resetting/starting over.
+ */
+export function unloadFont(): void {
+  if (currentFontUrl) {
+    URL.revokeObjectURL(currentFontUrl);
+    currentFontUrl = null;
+  }
+  currentFontDataUrl = null;
+
+  for (const face of document.fonts) {
+    if (face.family === FONT_FAMILY_NAME) {
+      document.fonts.delete(face);
+    }
+  }
+}
+
 export function getFontFamilyName(): string {
   return FONT_FAMILY_NAME;
 }
@@ -79,15 +73,12 @@ export function getFontFamilyName(): string {
 /**
  * Get a CSS @font-face rule with the font embedded as a base64 data URL.
  * Used by html-to-image to embed the custom font in exported images.
- *
- * The format() hint matches the actual font data so browsers don't
- * silently ignore it (this was the cause of broken sticky-note exports).
  */
 export function getFontEmbedCSS(): string | null {
   if (!currentFontDataUrl) return null;
   return `@font-face {
   font-family: "${FONT_FAMILY_NAME}";
-  src: url(${currentFontDataUrl}) format("${currentFontFormat}");
+  src: url(${currentFontDataUrl}) format("truetype");
   font-weight: normal;
   font-style: normal;
 }`;

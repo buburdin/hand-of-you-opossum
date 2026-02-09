@@ -1,4 +1,4 @@
-export const PANGRAMS = [
+const PANGRAMS = [
   "The quick brown fox jumps over the lazy dog",
   "Pack my box with five dozen liquor jugs",
   "How vexingly quick daft zebras jump",
@@ -11,18 +11,6 @@ export const PANGRAMS = [
 
 export function getRandomPangram(): string {
   return PANGRAMS[Math.floor(Math.random() * PANGRAMS.length)];
-}
-
-export function getUniqueChars(pangram: string): string[] {
-  const seen = new Set<string>();
-  const chars: string[] = [];
-  for (const c of pangram.toLowerCase()) {
-    if (/[a-z]/.test(c) && !seen.has(c)) {
-      seen.add(c);
-      chars.push(c);
-    }
-  }
-  return chars;
 }
 
 // All 26 letters for draw mode

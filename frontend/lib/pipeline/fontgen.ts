@@ -216,8 +216,6 @@ function pathBoundingBox(cmds: PathCommand[]): {
  */
 function transformToFontCoords(
   cmds: PathCommand[],
-  sourceWidth: number,
-  sourceHeight: number,
 ): { commands: PathCommand[]; advanceWidth: number; lsb: number } {
   const bbox = pathBoundingBox(cmds);
   const bw = bbox.maxX - bbox.minX;
@@ -367,11 +365,7 @@ export function generateFont(
     if (allCommands.length === 0) continue;
 
     // Transform to font coordinate space
-    const { commands, advanceWidth } = transformToFontCoords(
-      allCommands,
-      glyph.sourceWidth,
-      glyph.sourceHeight,
-    );
+    const { commands, advanceWidth } = transformToFontCoords(allCommands);
 
     if (commands.length === 0) continue;
 

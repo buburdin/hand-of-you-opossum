@@ -242,6 +242,8 @@ export function morphClose(
 
 // ─── connected components ─────────────────────────────────────────────────────
 
+import { labelConnectedComponents } from "./cc";
+
 /** Remove connected components smaller than minArea pixels. */
 export function removeSmallComponents(
   binary: Uint8Array,
@@ -249,39 +251,12 @@ export function removeSmallComponents(
   h: number,
   minArea: number,
 ): Uint8Array {
-  const labels = new Int32Array(w * h);
-  labels.fill(-1);
-  let nextLabel = 0;
-  const areas: number[] = [];
+  const { labels, count } = labelConnectedComponents(binary, w, h);
 
-  // Simple flood-fill labelling (8-connectivity)
-  const stack: number[] = [];
-  for (let i = 0; i < binary.length; i++) {
-    if (binary[i] === 0 || labels[i] !== -1) continue;
-    const label = nextLabel++;
-    let area = 0;
-    stack.push(i);
-    while (stack.length > 0) {
-      const idx = stack.pop()!;
-      if (labels[idx] !== -1) continue;
-      if (binary[idx] === 0) continue;
-      labels[idx] = label;
-      area++;
-      const x = idx % w;
-      const y = (idx - x) / w;
-      for (let dy = -1; dy <= 1; dy++) {
-        const ny = y + dy;
-        if (ny < 0 || ny >= h) continue;
-        for (let dx = -1; dx <= 1; dx++) {
-          if (dx === 0 && dy === 0) continue;
-          const nx = x + dx;
-          if (nx < 0 || nx >= w) continue;
-          const ni = ny * w + nx;
-          if (labels[ni] === -1 && binary[ni] === 255) stack.push(ni);
-        }
-      }
-    }
-    areas.push(area);
+  // Count area per component
+  const areas = new Uint32Array(count);
+  for (let i = 0; i < labels.length; i++) {
+    if (labels[i] >= 0) areas[labels[i]]++;
   }
 
   const out = new Uint8Array(w * h);

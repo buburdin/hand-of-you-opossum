@@ -10,16 +10,24 @@ import { binaryToImageData } from "./preprocess";
 // Lazy-loaded potrace module
 let potraceReady = false;
 let potraceFn: (source: ImageBitmapSource, options: object) => Promise<string>;
+let initPromise: Promise<void> | null = null;
 
 /**
  * Initialize the potrace WASM module (called once, idempotent).
+ * Safe against concurrent calls — stores the init promise.
  */
 export async function initPotrace(): Promise<void> {
   if (potraceReady) return;
-  const mod = await import("esm-potrace-wasm");
-  await mod.init();
-  potraceFn = mod.potrace;
-  potraceReady = true;
+  if (initPromise) return initPromise;
+
+  initPromise = (async () => {
+    const mod = await import("esm-potrace-wasm");
+    await mod.init();
+    potraceFn = mod.potrace;
+    potraceReady = true;
+  })();
+
+  return initPromise;
 }
 
 /**

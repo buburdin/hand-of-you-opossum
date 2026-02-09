@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { spring } from "@/lib/motion";
 
 type CameraStatus =
   | "initializing"
@@ -17,7 +18,14 @@ interface CameraCaptureProps {
   onClose: () => void;
 }
 
-const spring = { type: "spring" as const, stiffness: 400, damping: 30 };
+const CAMERA_CONSTRAINTS: MediaStreamConstraints = {
+  audio: false,
+  video: {
+    facingMode: { ideal: "environment" },
+    width: { ideal: 1280 },
+    height: { ideal: 720 },
+  },
+};
 
 export default function CameraCapture({
   onCapture,
@@ -42,14 +50,7 @@ export default function CameraCapture({
 
     async function init() {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: false,
-          video: {
-            facingMode: { ideal: "environment" },
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-          },
-        });
+        const stream = await navigator.mediaDevices.getUserMedia(CAMERA_CONSTRAINTS);
 
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop());
@@ -129,14 +130,7 @@ export default function CameraCapture({
     // Re-initialize camera stream
     setStatus("initializing");
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: {
-          facingMode: { ideal: "environment" },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-      });
+      const stream = await navigator.mediaDevices.getUserMedia(CAMERA_CONSTRAINTS);
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;

@@ -1,8 +1,8 @@
 "use client";
 
 import { motion } from "framer-motion";
-
-type Mode = "snap" | "draw";
+import { springSnappy } from "@/lib/motion";
+import type { Mode } from "@/lib/types";
 
 interface ModeSelectorProps {
   mode: Mode;
@@ -21,7 +21,7 @@ export default function ModeSelector({ mode, onModeChange }: ModeSelectorProps) 
           left: mode === "snap" ? "2px" : "50%",
           right: mode === "draw" ? "2px" : "50%",
         }}
-        transition={{ type: "spring", stiffness: 500, damping: 35 }}
+        transition={springSnappy}
       />
       <button
         onClick={() => onModeChange("snap")}

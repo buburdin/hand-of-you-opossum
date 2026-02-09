@@ -3,6 +3,8 @@
  * Port of backend/pipeline/segment.py to client-side JS.
  */
 
+import { labelConnectedComponents } from "./cc";
+
 export interface BBox {
   x: number;
   y: number;
@@ -29,56 +31,35 @@ export function findBoundingBoxes(
   h: number,
   minSize = 5,
 ): BBox[] {
-  const labels = new Int32Array(w * h);
-  labels.fill(-1);
-  let nextLabel = 0;
-  const bboxes: Map<number, BBox> = new Map();
+  const { labels, count } = labelConnectedComponents(binary, w, h);
 
-  const stack: number[] = [];
+  // Initialize bounding boxes per component
+  const mins = new Int32Array(count * 2).fill(Infinity);
+  const maxs = new Int32Array(count * 2).fill(-1);
 
-  for (let i = 0; i < binary.length; i++) {
-    if (binary[i] === 0 || labels[i] !== -1) continue;
+  for (let i = 0; i < labels.length; i++) {
+    if (labels[i] < 0) continue;
+    const label = labels[i];
+    const x = i % w;
+    const y = (i - x) / w;
+    const off = label * 2;
+    if (x < mins[off]) mins[off] = x;
+    if (y < mins[off + 1]) mins[off + 1] = y;
+    if (x > maxs[off]) maxs[off] = x;
+    if (y > maxs[off + 1]) maxs[off + 1] = y;
+  }
 
-    const label = nextLabel++;
-    const bbox: BBox = { x: w, y: h, w: 0, h: 0 };
-    let xMax = 0;
-    let yMax = 0;
-
-    stack.push(i);
-    while (stack.length > 0) {
-      const idx = stack.pop()!;
-      if (labels[idx] !== -1) continue;
-      if (binary[idx] === 0) continue;
-      labels[idx] = label;
-
-      const px = idx % w;
-      const py = (idx - px) / w;
-      if (px < bbox.x) bbox.x = px;
-      if (py < bbox.y) bbox.y = py;
-      if (px > xMax) xMax = px;
-      if (py > yMax) yMax = py;
-
-      for (let dy = -1; dy <= 1; dy++) {
-        const ny = py + dy;
-        if (ny < 0 || ny >= h) continue;
-        for (let dx = -1; dx <= 1; dx++) {
-          if (dx === 0 && dy === 0) continue;
-          const nx = px + dx;
-          if (nx < 0 || nx >= w) continue;
-          const ni = ny * w + nx;
-          if (labels[ni] === -1 && binary[ni] === 255) stack.push(ni);
-        }
-      }
-    }
-
-    bbox.w = xMax - bbox.x + 1;
-    bbox.h = yMax - bbox.y + 1;
-    if (bbox.w >= minSize && bbox.h >= minSize) {
-      bboxes.set(label, bbox);
+  const result: BBox[] = [];
+  for (let i = 0; i < count; i++) {
+    const off = i * 2;
+    const bw = maxs[off] - mins[off] + 1;
+    const bh = maxs[off + 1] - mins[off + 1] + 1;
+    if (bw >= minSize && bh >= minSize) {
+      result.push({ x: mins[off], y: mins[off + 1], w: bw, h: bh });
     }
   }
 
-  return Array.from(bboxes.values());
+  return result;
 }
 
 // ─── merge close bounding boxes ───────────────────────────────────────────────
