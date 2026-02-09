@@ -14,15 +14,12 @@ const TARGET_HEIGHT = ASCENDER - DESCENDER; // 1000
 
 // ─── SVG path parsing ────────────────────────────────────────────────────────
 
-interface PathCommand {
-  type: "M" | "L" | "C" | "Q" | "Z";
-  x?: number;
-  y?: number;
-  x1?: number;
-  y1?: number;
-  x2?: number;
-  y2?: number;
-}
+type PathCommand =
+  | { type: "M"; x: number; y: number }
+  | { type: "L"; x: number; y: number }
+  | { type: "C"; x: number; y: number; x1: number; y1: number; x2: number; y2: number }
+  | { type: "Q"; x: number; y: number; x1: number; y1: number }
+  | { type: "Z" };
 
 /**
  * Parse an SVG path `d` attribute into an array of path commands.
@@ -50,14 +47,22 @@ export function parseSvgPath(d: string): PathCommand[] {
         for (let i = 0; i < nums.length; i += 2) {
           curX = nums[i];
           curY = nums[i + 1];
-          commands.push({ type: i === 0 ? "M" : "L", x: curX, y: curY });
+          if (i === 0) {
+            commands.push({ type: "M", x: curX, y: curY });
+          } else {
+            commands.push({ type: "L", x: curX, y: curY });
+          }
         }
         break;
       case "m":
         for (let i = 0; i < nums.length; i += 2) {
           curX += nums[i];
           curY += nums[i + 1];
-          commands.push({ type: i === 0 ? "M" : "L", x: curX, y: curY });
+          if (i === 0) {
+            commands.push({ type: "M", x: curX, y: curY });
+          } else {
+            commands.push({ type: "L", x: curX, y: curY });
+          }
         }
         break;
       case "L":
@@ -181,24 +186,28 @@ function pathBoundingBox(cmds: PathCommand[]): {
     maxX = -Infinity,
     maxY = -Infinity;
 
+  const update = (x: number, y: number) => {
+    if (x < minX) minX = x;
+    if (y < minY) minY = y;
+    if (x > maxX) maxX = x;
+    if (y > maxY) maxY = y;
+  };
+
   for (const cmd of cmds) {
-    if (cmd.x !== undefined && cmd.y !== undefined) {
-      if (cmd.x < minX) minX = cmd.x;
-      if (cmd.y < minY) minY = cmd.y;
-      if (cmd.x > maxX) maxX = cmd.x;
-      if (cmd.y > maxY) maxY = cmd.y;
-    }
-    if (cmd.x1 !== undefined && cmd.y1 !== undefined) {
-      if (cmd.x1 < minX) minX = cmd.x1;
-      if (cmd.y1 < minY) minY = cmd.y1;
-      if (cmd.x1 > maxX) maxX = cmd.x1;
-      if (cmd.y1 > maxY) maxY = cmd.y1;
-    }
-    if (cmd.x2 !== undefined && cmd.y2 !== undefined) {
-      if (cmd.x2 < minX) minX = cmd.x2;
-      if (cmd.y2 < minY) minY = cmd.y2;
-      if (cmd.x2 > maxX) maxX = cmd.x2;
-      if (cmd.y2 > maxY) maxY = cmd.y2;
+    switch (cmd.type) {
+      case "M":
+      case "L":
+        update(cmd.x, cmd.y);
+        break;
+      case "C":
+        update(cmd.x, cmd.y);
+        update(cmd.x1, cmd.y1);
+        update(cmd.x2, cmd.y2);
+        break;
+      case "Q":
+        update(cmd.x, cmd.y);
+        update(cmd.x1, cmd.y1);
+        break;
     }
   }
 
@@ -243,20 +252,20 @@ function transformToFontCoords(
     switch (cmd.type) {
       case "M":
       case "L": {
-        const [x, y] = transform(cmd.x!, cmd.y!);
+        const [x, y] = transform(cmd.x, cmd.y);
         transformed.push({ type: cmd.type, x, y });
         break;
       }
       case "C": {
-        const [x, y] = transform(cmd.x!, cmd.y!);
-        const [x1, y1] = transform(cmd.x1!, cmd.y1!);
-        const [x2, y2] = transform(cmd.x2!, cmd.y2!);
+        const [x, y] = transform(cmd.x, cmd.y);
+        const [x1, y1] = transform(cmd.x1, cmd.y1);
+        const [x2, y2] = transform(cmd.x2, cmd.y2);
         transformed.push({ type: "C", x, y, x1, y1, x2, y2 });
         break;
       }
       case "Q": {
-        const [x, y] = transform(cmd.x!, cmd.y!);
-        const [x1, y1] = transform(cmd.x1!, cmd.y1!);
+        const [x, y] = transform(cmd.x, cmd.y);
+        const [x1, y1] = transform(cmd.x1, cmd.y1);
         transformed.push({ type: "Q", x, y, x1, y1 });
         break;
       }
@@ -280,16 +289,16 @@ function commandsToOpentypePath(cmds: PathCommand[]): opentype.Path {
   for (const cmd of cmds) {
     switch (cmd.type) {
       case "M":
-        path.moveTo(cmd.x!, cmd.y!);
+        path.moveTo(cmd.x, cmd.y);
         break;
       case "L":
-        path.lineTo(cmd.x!, cmd.y!);
+        path.lineTo(cmd.x, cmd.y);
         break;
       case "C":
-        path.curveTo(cmd.x1!, cmd.y1!, cmd.x2!, cmd.y2!, cmd.x!, cmd.y!);
+        path.curveTo(cmd.x1, cmd.y1, cmd.x2, cmd.y2, cmd.x, cmd.y);
         break;
       case "Q":
-        path.quadTo(cmd.x1!, cmd.y1!, cmd.x!, cmd.y!);
+        path.quadTo(cmd.x1, cmd.y1, cmd.x, cmd.y);
         break;
       case "Z":
         path.closePath();

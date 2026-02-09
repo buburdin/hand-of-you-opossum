@@ -29,14 +29,11 @@ export function labelConnectedComponents(
     if (binary[i] === 0 || labels[i] !== -1) continue;
 
     const label = nextLabel++;
+    labels[i] = label;
     stack.push(i);
 
     while (stack.length > 0) {
       const idx = stack.pop()!;
-      if (labels[idx] !== -1) continue;
-      if (binary[idx] === 0) continue;
-      labels[idx] = label;
-
       const x = idx % w;
       const y = (idx - x) / w;
       for (let dy = -1; dy <= 1; dy++) {
@@ -47,7 +44,10 @@ export function labelConnectedComponents(
           const nx = x + dx;
           if (nx < 0 || nx >= w) continue;
           const ni = ny * w + nx;
-          if (labels[ni] === -1 && binary[ni] === 255) stack.push(ni);
+          if (labels[ni] === -1 && binary[ni] === 255) {
+            labels[ni] = label;
+            stack.push(ni);
+          }
         }
       }
     }
