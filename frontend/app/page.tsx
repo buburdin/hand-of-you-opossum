@@ -7,19 +7,22 @@ import PangramCapture from "@/components/PangramCapture";
 import DrawCanvas from "@/components/DrawCanvas";
 import ProcessingAnimation from "@/components/ProcessingAnimation";
 import TextPlayground from "@/components/TextPlayground";
-import FontExport, { exportElementAsImage } from "@/components/FontExport";
+import FontExport from "@/components/FontExport";
+import { exportElementAsImage } from "@/lib/imageExport";
 import ThemeToggle from "@/components/ThemeToggle";
 import {
   processPangramLocally,
   processDrawnGlyphsLocally,
   type FontResult,
 } from "@/lib/pipeline";
-import { loadFont } from "@/lib/fontLoader";
+import { loadFont, unloadFont } from "@/lib/fontLoader";
+import { spring } from "@/lib/motion";
+import type { Mode } from "@/lib/types";
 
 type Step = "landing" | "input" | "processing" | "playground";
-type Mode = "snap" | "draw";
 
-const spring = { type: "spring" as const, stiffness: 400, damping: 30 };
+const STEP_TIMER_MS = 700;
+const STEP_TRANSITION_DELAY_MS = 500;
 
 export default function Home() {
   const [step, setStep] = useState<Step>("landing");
@@ -27,7 +30,6 @@ export default function Home() {
   const [processingStep, setProcessingStep] = useState(0);
   const [fontResult, setFontResult] = useState<FontResult | null>(null);
   const [fontLoaded, setFontLoaded] = useState(false);
-  const [charsFound, setCharsFound] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
 
@@ -37,74 +39,60 @@ export default function Home() {
   }, []);
 
   const handleStart = () => {
+    if (step !== "landing") return;
     setStep("input");
     setError(null);
   };
 
-  const handlePangramCapture = useCallback(
-    async (file: File | Blob, pangram: string) => {
+  const processAndLoadFont = useCallback(
+    async (process: () => Promise<FontResult>) => {
       setStep("processing");
       setProcessingStep(0);
       setError(null);
 
-      try {
-        const stepTimer = setInterval(() => {
-          setProcessingStep((s) => Math.min(s + 1, 3));
-        }, 800);
+      const stepTimer = setInterval(() => {
+        setProcessingStep((s) => Math.min(s + 1, 3));
+      }, STEP_TIMER_MS);
 
-        const result = await processPangramLocally(file, pangram);
+      try {
+        const result = await process();
         clearInterval(stepTimer);
         setProcessingStep(3);
 
         setFontResult(result);
         await loadFont(result.ttf);
         setFontLoaded(true);
-        setCharsFound(result.charsFound);
 
-        setTimeout(() => setStep("playground"), 500);
+        setTimeout(() => setStep("playground"), STEP_TRANSITION_DELAY_MS);
       } catch (err) {
+        clearInterval(stepTimer);
         setError(err instanceof Error ? err.message : "Something went wrong");
         setStep("input");
       }
     },
-    []
+    [],
+  );
+
+  const handlePangramCapture = useCallback(
+    (file: File | Blob, pangram: string) => {
+      processAndLoadFont(() => processPangramLocally(file, pangram));
+    },
+    [processAndLoadFont],
   );
 
   const handleDrawComplete = useCallback(
-    async (glyphImages: Record<string, Blob>) => {
-      setStep("processing");
-      setProcessingStep(0);
-      setError(null);
-
-      try {
-        const stepTimer = setInterval(() => {
-          setProcessingStep((s) => Math.min(s + 1, 3));
-        }, 600);
-
-        const result = await processDrawnGlyphsLocally(glyphImages);
-        clearInterval(stepTimer);
-        setProcessingStep(3);
-
-        setFontResult(result);
-        await loadFont(result.ttf);
-        setFontLoaded(true);
-        setCharsFound(result.charsFound);
-
-        setTimeout(() => setStep("playground"), 500);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong");
-        setStep("input");
-      }
+    (glyphImages: Record<string, Blob>) => {
+      processAndLoadFont(() => processDrawnGlyphsLocally(glyphImages));
     },
-    []
+    [processAndLoadFont],
   );
 
   const handleStartOver = () => {
     setStep("landing");
     setFontResult(null);
     setFontLoaded(false);
-    setCharsFound([]);
     setError(null);
+    unloadFont();
   };
 
   return (
@@ -155,15 +143,13 @@ export default function Home() {
                 </p>
               </div>
 
-              <motion.button
+              <button
                 onClick={handleStart}
-                className="px-8 py-3.5 rounded-full bg-fg text-bg text-sm tracking-wide hover:bg-fg/85 transition-colors"
+                className="px-8 py-3.5 rounded-full bg-fg text-bg text-sm tracking-wide hover:bg-fg/85 transition-all hover:scale-[1.02] active:scale-[0.98]"
                 style={{ boxShadow: "var(--shadow-md)" }}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
               >
                 make your font
-              </motion.button>
+              </button>
 
               <div className="flex gap-6 text-[10px] uppercase tracking-[0.2em] text-fg/25">
                 <span>free</span>
@@ -234,7 +220,7 @@ export default function Home() {
               />
               <FontExport
                 ttfData={fontResult?.ttf ?? null}
-                charsFound={charsFound}
+                charsFound={fontResult?.charsFound ?? []}
               />
             </motion.div>
           )}
