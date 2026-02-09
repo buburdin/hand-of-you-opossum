@@ -63,17 +63,19 @@ export function extractSvgPaths(svgString: string): string[] {
 export function extractSvgViewBox(
   svgString: string,
 ): { width: number; height: number } | null {
-  // Potrace typically outputs: width="Wpx" height="Hpx"
-  const wMatch = svgString.match(/width="(\d+)(?:px)?"/);
-  const hMatch = svgString.match(/height="(\d+)(?:px)?"/);
+  // Potrace outputs: width="W.000000" height="H.000000"
+  const wMatch = svgString.match(/width="(\d+(?:\.\d+)?)(?:px)?"/);
+  const hMatch = svgString.match(/height="(\d+(?:\.\d+)?)(?:px)?"/);
   if (wMatch && hMatch) {
-    return { width: parseInt(wMatch[1]), height: parseInt(hMatch[1]) };
+    return { width: parseFloat(wMatch[1]), height: parseFloat(hMatch[1]) };
   }
 
   // Fallback: try viewBox
-  const vbMatch = svgString.match(/viewBox="[^"]*\s(\d+)\s(\d+)"/);
+  const vbMatch = svgString.match(
+    /viewBox="\s*\S+\s+\S+\s+(\S+)\s+(\S+)\s*"/,
+  );
   if (vbMatch) {
-    return { width: parseInt(vbMatch[1]), height: parseInt(vbMatch[2]) };
+    return { width: parseFloat(vbMatch[1]), height: parseFloat(vbMatch[2]) };
   }
 
   return null;
@@ -91,10 +93,17 @@ export interface VectorizedGlyph {
 /**
  * Vectorize a single character bitmap into SVG path data.
  *
+ * IMPORTANT: Potrace wraps paths in <g transform="translate(0,H) scale(S,-S)">,
+ * which means the raw path coordinates are already in a Y-UP coordinate system
+ * (origin at bottom-left, Y increases upward), scaled by 1/S (typically 10x).
+ *
+ * We return these raw coordinates AS-IS because font coordinates are also Y-UP.
+ * fontgen.ts just needs to scale and translate — NO Y-flip needed.
+ *
  * @param binary  Binary Uint8Array (0 = bg, 255 = ink)
  * @param width   Bitmap width
  * @param height  Bitmap height
- * @returns SVG path data strings and source dimensions
+ * @returns SVG path data strings (in potrace's Y-UP raw coords) and source dimensions
  */
 export async function vectorizeGlyph(
   binary: Uint8Array,
@@ -111,7 +120,7 @@ export async function vectorizeGlyph(
   // Run potrace tracing
   const svgString = await potraceFn(imageData, TRACE_OPTIONS);
 
-  // Extract path data
+  // Extract raw path data — already Y-UP from potrace's internal transform
   const paths = extractSvgPaths(svgString);
 
   return {

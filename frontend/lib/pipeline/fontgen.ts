@@ -206,12 +206,13 @@ function pathBoundingBox(cmds: PathCommand[]): {
 }
 
 /**
- * Transform SVG path commands to font coordinate space.
+ * Transform path commands to font coordinate space.
  *
- * - Translates so bounding box starts at origin
- * - Scales to fit within font units (1000 UPM)
- * - Flips Y axis (SVG Y goes down, font Y goes up)
- * - Adds left side bearing offset
+ * Potrace's raw path coordinates are already Y-UP (via its internal
+ * translate+scale transform), so NO Y-flip is needed. We just:
+ * - Translate so bounding box starts at the descender
+ * - Scale to fit within font units (1000 UPM)
+ * - Add left side bearing offset
  */
 function transformToFontCoords(
   cmds: PathCommand[],
@@ -231,9 +232,11 @@ function transformToFontCoords(
   const bearing = Math.round(scaledWidth * 0.12);
   const advanceWidth = scaledWidth + bearing * 2;
 
+  // No Y-flip: potrace raw coords are already Y-UP.
+  // Just scale to font units and position within em square.
   const transform = (x: number, y: number): [number, number] => {
     const fx = (x - bbox.minX) * scale + bearing;
-    const fy = TARGET_HEIGHT - (y - bbox.minY) * scale + DESCENDER;
+    const fy = (y - bbox.minY) * scale + DESCENDER;
     return [Math.round(fx), Math.round(fy)];
   };
 
@@ -265,102 +268,7 @@ function transformToFontCoords(
     }
   }
 
-  // Y-flip reverses winding direction — reverse contours to fix fill
-  const corrected = reverseContours(transformed);
-
-  return { commands: corrected, advanceWidth, lsb: bearing };
-}
-
-// ─── winding direction fix ────────────────────────────────────────────────────
-
-/**
- * Reverse the winding direction of all contours (sub-paths) in a path.
- *
- * When we flip the Y axis (SVG→font coords), the winding direction of every
- * contour reverses. This causes fills to invert (letter body becomes a hole,
- * surrounding area becomes filled). Reversing each contour restores correct fill.
- */
-function reverseContours(cmds: PathCommand[]): PathCommand[] {
-  // Split into sub-paths (each M…Z sequence)
-  const subPaths: PathCommand[][] = [];
-  let current: PathCommand[] = [];
-
-  for (const cmd of cmds) {
-    current.push(cmd);
-    if (cmd.type === "Z") {
-      subPaths.push(current);
-      current = [];
-    }
-  }
-  if (current.length > 0) subPaths.push(current);
-
-  return subPaths.flatMap((sp) => reverseSubPath(sp));
-}
-
-function reverseSubPath(path: PathCommand[]): PathCommand[] {
-  if (path.length <= 1) return path;
-
-  const hasClose = path[path.length - 1].type === "Z";
-  const commands = hasClose ? path.slice(0, -1) : [...path];
-
-  // Build segment list tracking start/end points of each draw command
-  interface Segment {
-    cmd: PathCommand;
-    startX: number;
-    startY: number;
-  }
-
-  const segments: Segment[] = [];
-  let cx = commands[0].x!;
-  let cy = commands[0].y!;
-
-  for (let i = 1; i < commands.length; i++) {
-    const cmd = commands[i];
-    segments.push({ cmd, startX: cx, startY: cy });
-    cx = cmd.x!;
-    cy = cmd.y!;
-  }
-
-  if (segments.length === 0) return path;
-
-  // Reversed path starts at the last endpoint
-  const result: PathCommand[] = [{ type: "M", x: cx, y: cy }];
-
-  // Walk segments in reverse order
-  for (let i = segments.length - 1; i >= 0; i--) {
-    const seg = segments[i];
-    switch (seg.cmd.type) {
-      case "M":
-      case "L":
-        result.push({ type: "L", x: seg.startX, y: seg.startY });
-        break;
-      case "C":
-        // Reverse cubic: swap control points, target = previous start
-        result.push({
-          type: "C",
-          x1: seg.cmd.x2!,
-          y1: seg.cmd.y2!,
-          x2: seg.cmd.x1!,
-          y2: seg.cmd.y1!,
-          x: seg.startX,
-          y: seg.startY,
-        });
-        break;
-      case "Q":
-        // Reverse quadratic: control point unchanged, target = previous start
-        result.push({
-          type: "Q",
-          x1: seg.cmd.x1!,
-          y1: seg.cmd.y1!,
-          x: seg.startX,
-          y: seg.startY,
-        });
-        break;
-    }
-  }
-
-  if (hasClose) result.push({ type: "Z" });
-  return result;
+  return { commands: transformed, advanceWidth, lsb: bearing };
 }
 
 // ─── opentype.js glyph building ──────────────────────────────────────────────
