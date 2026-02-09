@@ -7,13 +7,31 @@
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
-/** Load an image Blob/File into an ImageData via an off-screen canvas. */
+/**
+ * Maximum dimension for preprocessing. Larger images are downscaled
+ * to keep adaptive threshold block sizes effective and processing fast.
+ * Phone cameras often produce 3000-4000px images; 1200px is a good balance.
+ */
+const MAX_PREPROCESS_DIM = 1200;
+
+/** Load an image Blob/File into an ImageData via an off-screen canvas.
+ *  Automatically downscales images larger than MAX_PREPROCESS_DIM. */
 export async function loadImageData(blob: Blob): Promise<ImageData> {
   const bitmap = await createImageBitmap(blob);
-  const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+  let { width, height } = bitmap;
+
+  // Downscale large images proportionally
+  const maxDim = Math.max(width, height);
+  if (maxDim > MAX_PREPROCESS_DIM) {
+    const scale = MAX_PREPROCESS_DIM / maxDim;
+    width = Math.round(width * scale);
+    height = Math.round(height * scale);
+  }
+
+  const canvas = new OffscreenCanvas(width, height);
   const ctx = canvas.getContext("2d")!;
-  ctx.drawImage(bitmap, 0, 0);
-  return ctx.getImageData(0, 0, bitmap.width, bitmap.height);
+  ctx.drawImage(bitmap, 0, 0, width, height);
+  return ctx.getImageData(0, 0, width, height);
 }
 
 /** Convert RGBA ImageData to a single-channel grayscale Uint8Array. */
@@ -315,8 +333,11 @@ export async function preprocessGlyph(
 }
 
 /**
- * Convert a binary Uint8Array back to ImageData (for potrace / display).
- * White-on-black binary → RGBA.
+ * Convert a binary Uint8Array to ImageData for potrace.
+ *
+ * IMPORTANT: Our binary format is white-on-black (ink = 255, bg = 0).
+ * Potrace traces BLACK regions, so we INVERT: ink → 0 (black), bg → 255 (white).
+ * This ensures potrace traces the letter shapes, not the background.
  */
 export function binaryToImageData(
   binary: Uint8Array,
@@ -325,7 +346,8 @@ export function binaryToImageData(
 ): ImageData {
   const data = new Uint8ClampedArray(w * h * 4);
   for (let i = 0; i < binary.length; i++) {
-    const v = binary[i];
+    // Invert: ink (255) → black (0), bg (0) → white (255)
+    const v = 255 - binary[i];
     data[i * 4] = v;
     data[i * 4 + 1] = v;
     data[i * 4 + 2] = v;

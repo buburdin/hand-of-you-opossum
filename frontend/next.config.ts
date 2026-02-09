@@ -5,8 +5,13 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
-  // Silence Turbopack warning about webpack config presence
-  turbopack: {},
+  // Turbopack config: stub out Node-only modules for browser builds
+  turbopack: {
+    resolveAlias: {
+      fs: { browser: "./lib/empty-module.ts" },
+      path: { browser: "./lib/empty-module.ts" },
+    },
+  },
   // Enable WASM support for esm-potrace-wasm (used in webpack builds)
   webpack(config) {
     config.experiments = {
@@ -17,6 +22,15 @@ const nextConfig: NextConfig = {
     config.output = {
       ...config.output,
       webassemblyModuleFilename: "static/wasm/[modulehash].wasm",
+    };
+    // Stub out Node-only modules for browser builds
+    config.resolve = {
+      ...config.resolve,
+      fallback: {
+        ...(config.resolve?.fallback || {}),
+        fs: false,
+        path: false,
+      },
     };
     return config;
   },

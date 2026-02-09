@@ -265,7 +265,102 @@ function transformToFontCoords(
     }
   }
 
-  return { commands: transformed, advanceWidth, lsb: bearing };
+  // Y-flip reverses winding direction — reverse contours to fix fill
+  const corrected = reverseContours(transformed);
+
+  return { commands: corrected, advanceWidth, lsb: bearing };
+}
+
+// ─── winding direction fix ────────────────────────────────────────────────────
+
+/**
+ * Reverse the winding direction of all contours (sub-paths) in a path.
+ *
+ * When we flip the Y axis (SVG→font coords), the winding direction of every
+ * contour reverses. This causes fills to invert (letter body becomes a hole,
+ * surrounding area becomes filled). Reversing each contour restores correct fill.
+ */
+function reverseContours(cmds: PathCommand[]): PathCommand[] {
+  // Split into sub-paths (each M…Z sequence)
+  const subPaths: PathCommand[][] = [];
+  let current: PathCommand[] = [];
+
+  for (const cmd of cmds) {
+    current.push(cmd);
+    if (cmd.type === "Z") {
+      subPaths.push(current);
+      current = [];
+    }
+  }
+  if (current.length > 0) subPaths.push(current);
+
+  return subPaths.flatMap((sp) => reverseSubPath(sp));
+}
+
+function reverseSubPath(path: PathCommand[]): PathCommand[] {
+  if (path.length <= 1) return path;
+
+  const hasClose = path[path.length - 1].type === "Z";
+  const commands = hasClose ? path.slice(0, -1) : [...path];
+
+  // Build segment list tracking start/end points of each draw command
+  interface Segment {
+    cmd: PathCommand;
+    startX: number;
+    startY: number;
+  }
+
+  const segments: Segment[] = [];
+  let cx = commands[0].x!;
+  let cy = commands[0].y!;
+
+  for (let i = 1; i < commands.length; i++) {
+    const cmd = commands[i];
+    segments.push({ cmd, startX: cx, startY: cy });
+    cx = cmd.x!;
+    cy = cmd.y!;
+  }
+
+  if (segments.length === 0) return path;
+
+  // Reversed path starts at the last endpoint
+  const result: PathCommand[] = [{ type: "M", x: cx, y: cy }];
+
+  // Walk segments in reverse order
+  for (let i = segments.length - 1; i >= 0; i--) {
+    const seg = segments[i];
+    switch (seg.cmd.type) {
+      case "M":
+      case "L":
+        result.push({ type: "L", x: seg.startX, y: seg.startY });
+        break;
+      case "C":
+        // Reverse cubic: swap control points, target = previous start
+        result.push({
+          type: "C",
+          x1: seg.cmd.x2!,
+          y1: seg.cmd.y2!,
+          x2: seg.cmd.x1!,
+          y2: seg.cmd.y1!,
+          x: seg.startX,
+          y: seg.startY,
+        });
+        break;
+      case "Q":
+        // Reverse quadratic: control point unchanged, target = previous start
+        result.push({
+          type: "Q",
+          x1: seg.cmd.x1!,
+          y1: seg.cmd.y1!,
+          x: seg.startX,
+          y: seg.startY,
+        });
+        break;
+    }
+  }
+
+  if (hasClose) result.push({ type: "Z" });
+  return result;
 }
 
 // ─── opentype.js glyph building ──────────────────────────────────────────────
