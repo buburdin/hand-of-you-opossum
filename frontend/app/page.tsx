@@ -9,7 +9,11 @@ import ProcessingAnimation from "@/components/ProcessingAnimation";
 import TextPlayground from "@/components/TextPlayground";
 import FontExport, { exportElementAsImage } from "@/components/FontExport";
 import ThemeToggle from "@/components/ThemeToggle";
-import { processPangram, processDrawnGlyphs, FontResult } from "@/lib/api";
+import {
+  processPangramLocally,
+  processDrawnGlyphsLocally,
+  type FontResult,
+} from "@/lib/pipeline";
 import { loadFont } from "@/lib/fontLoader";
 
 type Step = "landing" | "input" | "processing" | "playground";
@@ -48,13 +52,14 @@ export default function Home() {
           setProcessingStep((s) => Math.min(s + 1, 3));
         }, 800);
 
-        const result = await processPangram(file, pangram);
+        const result = await processPangramLocally(file, pangram);
         clearInterval(stepTimer);
         setProcessingStep(3);
 
         setFontResult(result);
-        await loadFont(result.woff2);
+        await loadFont(result.ttf);
         setFontLoaded(true);
+        setCharsFound(result.charsFound);
 
         setTimeout(() => setStep("playground"), 500);
       } catch (err) {
@@ -76,14 +81,14 @@ export default function Home() {
           setProcessingStep((s) => Math.min(s + 1, 3));
         }, 600);
 
-        const result = await processDrawnGlyphs(glyphImages);
+        const result = await processDrawnGlyphsLocally(glyphImages);
         clearInterval(stepTimer);
         setProcessingStep(3);
 
         setFontResult(result);
-        await loadFont(result.woff2);
+        await loadFont(result.ttf);
         setFontLoaded(true);
-        setCharsFound(Object.keys(glyphImages));
+        setCharsFound(result.charsFound);
 
         setTimeout(() => setStep("playground"), 500);
       } catch (err) {
@@ -229,7 +234,6 @@ export default function Home() {
               />
               <FontExport
                 ttfData={fontResult?.ttf ?? null}
-                woff2Data={fontResult?.woff2 ?? null}
                 charsFound={charsFound}
               />
             </motion.div>
