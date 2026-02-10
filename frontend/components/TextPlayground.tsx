@@ -1,12 +1,15 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, forwardRef, useImperativeHandle } from "react";
 import { motion } from "framer-motion";
 import { getFontFamilyName } from "@/lib/fontLoader";
 
 interface TextPlaygroundProps {
   fontLoaded: boolean;
-  onExportImage: (element: HTMLElement) => void;
+}
+
+export interface TextPlaygroundHandle {
+  getDisplayElement: () => HTMLElement | null;
 }
 
 const SAMPLE_TEXTS = [
@@ -16,21 +19,23 @@ const SAMPLE_TEXTS = [
   "pack my box with five dozen liquor jugs",
 ];
 
-export default function TextPlayground({
-  fontLoaded,
-  onExportImage,
-}: TextPlaygroundProps) {
+const TextPlayground = forwardRef<TextPlaygroundHandle, TextPlaygroundProps>(
+  function TextPlayground({ fontLoaded }, ref) {
   const [text, setText] = useState("hello world, this is my handwriting!");
   const [fontSize, setFontSize] = useState(36);
   const textDisplayRef = useRef<HTMLDivElement>(null);
   const fontFamily = getFontFamilyName();
+
+  useImperativeHandle(ref, () => ({
+    getDisplayElement: () => textDisplayRef.current,
+  }));
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 400, damping: 30 }}
-      className="flex flex-col items-center gap-6 w-full max-w-2xl mx-auto"
+      className="flex flex-col items-center gap-6 w-full max-w-xl mx-auto"
     >
       <div className="text-center space-y-1">
         <h2 className="text-sm font-medium tracking-wide">your font is ready</h2>
@@ -106,14 +111,8 @@ export default function TextPlayground({
         ))}
       </div>
 
-      {/* Export button */}
-      <button
-        onClick={() => textDisplayRef.current && onExportImage(textDisplayRef.current)}
-        className="px-5 py-2.5 rounded-full border border-border text-xs tracking-wide hover:border-fg/30 transition-colors"
-        style={{ boxShadow: "var(--shadow-sm)" }}
-      >
-        save as image
-      </button>
     </motion.div>
   );
-}
+});
+
+export default TextPlayground;

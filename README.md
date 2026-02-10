@@ -4,50 +4,62 @@ Turn your handwriting into a font. Snap a photo of a pangram or draw letters on 
 
 ## Stack
 
-- **Frontend**: Next.js 15, Tailwind CSS v4, Framer Motion
-- **Backend**: Python FastAPI, OpenCV, fontTools
-- **Font format**: TTF (download) + WOFF2 (web rendering)
+- **Next.js** (app runs entirely in the browser + one API route)
+- **Google Cloud Vision API** — character recognition from handwriting photos
+- **esm-potrace-wasm** — bitmap-to-vector tracing (runs in browser via WASM)
+- **opentype.js** — font generation (runs in browser)
+- **Tailwind CSS v4**, **Framer Motion** — UI
 
 ## Getting Started
-
-### Backend
-
-```bash
-cd backend
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
-```
-
-### Frontend
 
 ```bash
 cd frontend
 npm install
+```
+
+Create `frontend/.env.local` with your Google Vision API key:
+
+```
+GOOGLE_VISION_API_KEY=your-key-here
+```
+
+Then start the dev server:
+
+```bash
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
 
-Make sure `NEXT_PUBLIC_API_URL` is set to `http://localhost:8000` (default).
+## Environment Variables
+
+| Variable | Required | Where | Description |
+|---|---|---|---|
+| `GOOGLE_VISION_API_KEY` | Yes | `.env.local` | Google Cloud Vision API key. Server-side only — never exposed to the browser. |
 
 ## How It Works
 
 1. **Write** a pangram on paper or draw letters on screen
 2. **Snap** a photo or upload an image
-3. **Process**: OpenCV segments characters, contours are vectorized, fontTools assembles the font
-4. **Type** with your new font, download .ttf, or save text as an image
+3. **Process** (all in-browser):
+   - Preprocess image (grayscale, adaptive threshold, noise removal)
+   - Recognize characters via Google Vision API
+   - Vectorize each glyph bitmap (potrace WASM)
+   - Generate OTF font (opentype.js)
+4. **Type** with your new font, download .otf, or save text as an image
 
 ## Project Structure
 
 ```
-├── frontend/          Next.js app
-│   ├── app/           Pages and layout
-│   ├── components/    React components
-│   └── lib/           Utilities (API, font loader, pangrams)
-├── backend/           Python FastAPI
-│   ├── main.py        API endpoints
-│   └── pipeline/      Image processing + font generation
-└── README.md
+frontend/
+├── app/
+│   ├── api/vision/    Google Vision API proxy (keeps key server-side)
+│   ├── page.tsx       Main app page
+│   └── layout.tsx     Root layout
+├── components/        React components
+├── lib/
+│   ├── pipeline/      Full processing pipeline (preprocess → segment → vectorize → fontgen)
+│   ├── fontLoader.ts  FontFace loader
+│   └── pangrams.ts    Pangram collection
+└── public/            Static assets
 ```

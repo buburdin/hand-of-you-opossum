@@ -1,8 +1,6 @@
 /**
  * Image preprocessing for handwriting extraction.
  * Pure Canvas/ImageData implementation — no OpenCV needed.
- *
- * Ports the Python backend's preprocess.py to client-side JS.
  */
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -308,11 +306,11 @@ export async function preprocessPhoto(
 
   let gray = toGrayscale(image);
   gray = blur5x5(gray, width, height);
-  let binary = adaptiveThreshold(gray, width, height, 21, 10);
-  binary = morphClose(binary, width, height, 3, 3);
-  binary = removeSmallComponents(binary, width, height, 50);
+  // C bumped from 10→12 for thinner strokes (less merging between letters)
+  const binary = adaptiveThreshold(gray, width, height, 21, 12);
+  // morph close removed — was bridging nearby letters into single components
 
-  return { binary, width, height };
+  return { binary: removeSmallComponents(binary, width, height, 50), width, height };
 }
 
 /**

@@ -16,12 +16,12 @@ export default function ModeSelector({ mode, onModeChange }: ModeSelectorProps) 
     >
       <motion.div
         className="absolute top-0.5 bottom-0.5 rounded-full bg-fg"
-        initial={false}
-        animate={{
-          left: mode === "snap" ? "2px" : "50%",
-          right: mode === "draw" ? "2px" : "50%",
-        }}
+        layout
         transition={{ type: "spring", stiffness: 500, damping: 35 }}
+        style={{
+          left: mode === "snap" ? 2 : "50%",
+          right: mode === "draw" ? 2 : "50%",
+        }}
       />
       <button
         onClick={() => onModeChange("snap")}

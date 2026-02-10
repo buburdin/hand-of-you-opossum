@@ -2,17 +2,11 @@
 node_modules/
 frontend/node_modules/
 
-# Python
-backend/.venv/
-__pycache__/
-*.pyc
-*.pyo
-
 # Next.js
 frontend/.next/
 frontend/out/
 
-# Environment
+# Environment — NEVER commit API keys
 .env
 .env.local
 frontend/.env.local

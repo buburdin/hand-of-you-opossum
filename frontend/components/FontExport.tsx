@@ -20,11 +20,13 @@ function downloadFile(data: ArrayBuffer, filename: string, mimeType: string) {
 interface FontExportProps {
   ttfData: ArrayBuffer | null;
   charsFound?: string[];
+  onExportImage?: () => void;
 }
 
 export default function FontExport({
   ttfData,
   charsFound = [],
+  onExportImage,
 }: FontExportProps) {
   const handleDownloadTTF = () => {
     if (ttfData) {
@@ -39,14 +41,23 @@ export default function FontExport({
       transition={{ type: "spring", stiffness: 400, damping: 30, delay: 0.1 }}
       className="flex flex-col items-center gap-4"
     >
-      <button
-        onClick={handleDownloadTTF}
-        disabled={!ttfData}
-        className="px-5 py-2.5 rounded-full bg-fg text-bg text-xs tracking-wide hover:bg-fg/85 transition-colors disabled:opacity-30"
-        style={{ boxShadow: "var(--shadow-sm)" }}
-      >
-        download .ttf
-      </button>
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onExportImage}
+          className="px-5 py-2.5 rounded-full border border-border text-xs tracking-wide hover:border-fg/30 transition-colors"
+          style={{ boxShadow: "var(--shadow-sm)" }}
+        >
+          save as image
+        </button>
+        <button
+          onClick={handleDownloadTTF}
+          disabled={!ttfData}
+          className="px-5 py-2.5 rounded-full bg-fg text-bg text-xs tracking-wide hover:bg-fg/85 transition-colors disabled:opacity-30"
+          style={{ boxShadow: "var(--shadow-sm)" }}
+        >
+          download .ttf
+        </button>
+      </div>
 
       {charsFound.length > 0 && (
         <p className="text-[10px] text-fg/30 tracking-wide">

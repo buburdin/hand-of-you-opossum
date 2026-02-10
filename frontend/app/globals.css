@@ -39,10 +39,10 @@ html[data-theme="light"] {
     --shadow-lg: 0 10px 28px rgba(0, 0, 0, 0.6);
     --shadow-sticky: 0 12px 28px rgba(0, 0, 0, 0.6),
       0 1px 0 rgba(255, 255, 255, 0.06) inset;
-    --sticky-bg: #4a3f1f;
-    --sticky-highlight: #6a5825;
-    --sticky-bg-2: #5a4a22;
-    --sticky-border: rgba(255, 227, 119, 0.25);
+    --sticky-bg: #fff3a2;
+    --sticky-highlight: #ffed88;
+    --sticky-bg-2: #ffe277;
+    --sticky-border: rgba(26, 26, 26, 0.12);
     color-scheme: dark;
   }
 }
@@ -61,10 +61,10 @@ html[data-theme="night"] {
   --shadow-lg: 0 10px 28px rgba(0, 0, 0, 0.6);
   --shadow-sticky: 0 12px 28px rgba(0, 0, 0, 0.6),
     0 1px 0 rgba(255, 255, 255, 0.06) inset;
-  --sticky-bg: #4a3f1f;
-  --sticky-highlight: #6a5825;
-  --sticky-bg-2: #5a4a22;
-  --sticky-border: rgba(255, 227, 119, 0.25);
+  --sticky-bg: #fff3a2;
+  --sticky-highlight: #ffed88;
+  --sticky-bg-2: #ffe277;
+  --sticky-border: rgba(26, 26, 26, 0.12);
   color-scheme: dark;
 }
 
@@ -128,6 +128,21 @@ body {
   );
   border-color: var(--sticky-border);
   color: var(--ink);
+}
+
+/* Keep sticky note yellow in dark mode (same as light) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .sticky-note {
+    background: linear-gradient(135deg, #fff3a2 0%, #ffed88 60%, #ffe277 100%);
+    border-color: rgba(26, 26, 26, 0.12);
+    color: #1a1a1a;
+  }
+}
+
+html[data-theme="night"] .sticky-note {
+  background: linear-gradient(135deg, #fff3a2 0%, #ffed88 60%, #ffe277 100%);
+  border-color: rgba(26, 26, 26, 0.12);
+  color: #1a1a1a;
 }
 
 /* Subtle focus ring */

@@ -1,6 +1,5 @@
 /**
  * Character segmentation from preprocessed handwriting images.
- * Port of backend/pipeline/segment.py to client-side JS.
  */
 
 export interface BBox {

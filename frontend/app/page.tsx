@@ -1,20 +1,22 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import ModeSelector from "@/components/ModeSelector";
 import PangramCapture from "@/components/PangramCapture";
 import DrawCanvas from "@/components/DrawCanvas";
 import ProcessingAnimation from "@/components/ProcessingAnimation";
-import TextPlayground from "@/components/TextPlayground";
+import TextPlayground, { type TextPlaygroundHandle } from "@/components/TextPlayground";
 import FontExport, { exportElementAsImage } from "@/components/FontExport";
 import ThemeToggle from "@/components/ThemeToggle";
 import {
   processPangramLocally,
   processDrawnGlyphsLocally,
   type FontResult,
+  type PipelineDebugData,
 } from "@/lib/pipeline";
 import { loadFont } from "@/lib/fontLoader";
+import DebugOverlay from "@/components/DebugOverlay";
 
 type Step = "landing" | "input" | "processing" | "playground";
 type Mode = "snap" | "draw";
@@ -28,8 +30,10 @@ export default function Home() {
   const [fontResult, setFontResult] = useState<FontResult | null>(null);
   const [fontLoaded, setFontLoaded] = useState(false);
   const [charsFound, setCharsFound] = useState<string[]>([]);
+  const [debugData, setDebugData] = useState<PipelineDebugData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const playgroundRef = useRef<TextPlaygroundHandle>(null);
 
   // Avoid SSR opacity:0 — only animate after hydration
   useEffect(() => {
@@ -52,11 +56,12 @@ export default function Home() {
           setProcessingStep((s) => Math.min(s + 1, 3));
         }, 800);
 
-        const result = await processPangramLocally(file, pangram);
+        const result = await processPangramLocally(file, pangram, true);
         clearInterval(stepTimer);
         setProcessingStep(3);
 
         setFontResult(result);
+        if (result.debug) setDebugData(result.debug);
         await loadFont(result.ttf);
         setFontLoaded(true);
         setCharsFound(result.charsFound);
@@ -104,6 +109,7 @@ export default function Home() {
     setFontResult(null);
     setFontLoaded(false);
     setCharsFound([]);
+    setDebugData(null);
     setError(null);
   };
 
@@ -229,13 +235,18 @@ export default function Home() {
               className="flex flex-col items-center gap-8 w-full"
             >
               <TextPlayground
+                ref={playgroundRef}
                 fontLoaded={fontLoaded}
-                onExportImage={exportElementAsImage}
               />
               <FontExport
                 ttfData={fontResult?.ttf ?? null}
                 charsFound={charsFound}
+                onExportImage={() => {
+                  const el = playgroundRef.current?.getDisplayElement();
+                  if (el) exportElementAsImage(el);
+                }}
               />
+              {debugData && <DebugOverlay debug={debugData} />}
             </motion.div>
           )}
         </AnimatePresence>

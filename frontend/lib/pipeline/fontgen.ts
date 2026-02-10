@@ -6,7 +6,7 @@
 import opentype from "opentype.js";
 import type { VectorizedGlyph } from "./vectorize";
 
-// Font metrics (matching the Python backend)
+// Font metrics
 const UNITS_PER_EM = 1000;
 const ASCENDER = 800;
 const DESCENDER = -200;
