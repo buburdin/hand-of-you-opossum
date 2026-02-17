@@ -61,7 +61,7 @@ export default function FontExport({
 
       {charsFound.length > 0 && (
         <p className="text-[10px] text-fg/30 tracking-wide">
-          {charsFound.length} letters extracted: {charsFound.sort().join(" ")}
+          {charsFound.length} letters extracted: {[...charsFound].sort().join(" ")}
         </p>
       )}
     </motion.div>
@@ -94,5 +94,6 @@ export async function exportElementAsImage(element: HTMLElement) {
     link.click();
   } catch (err) {
     console.error("Failed to export image:", err);
+    throw err;
   }
 }

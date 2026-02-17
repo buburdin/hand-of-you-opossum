@@ -28,91 +28,10 @@ import {
   charCropsToDataURL,
   type PipelineDebugData,
 } from "./debug";
+import { labelFullImage, type LabeledImage } from "./components";
 
 export type { FontResult } from "./fontgen";
 export type { PipelineDebugData } from "./debug";
-
-// ─── Full-image component labeling ────────────────────────────────────────────
-
-interface ComponentInfo {
-  label: number;
-  area: number;
-  bbox: { x: number; y: number; w: number; h: number };
-}
-
-interface LabeledImage {
-  labels: Int32Array;
-  components: ComponentInfo[];
-  width: number;
-  height: number;
-}
-
-/**
- * Label all connected components in the full binary image (8-connectivity).
- * Run ONCE, then use the labels to extract characters by matching against
- * Vision bounding boxes.
- */
-function labelFullImage(
-  binary: Uint8Array,
-  w: number,
-  h: number,
-  minArea = 10,
-): LabeledImage {
-  const labels = new Int32Array(w * h).fill(-1);
-  let nextLabel = 0;
-  const components: ComponentInfo[] = [];
-  const stack: number[] = [];
-
-  for (let i = 0; i < binary.length; i++) {
-    if (binary[i] === 0 || labels[i] !== -1) continue;
-
-    const label = nextLabel++;
-    let area = 0;
-    let minX = w, minY = h, maxX = 0, maxY = 0;
-
-    stack.push(i);
-    while (stack.length > 0) {
-      const idx = stack.pop()!;
-      if (labels[idx] !== -1 || binary[idx] === 0) continue;
-      labels[idx] = label;
-      area++;
-
-      const px = idx % w;
-      const py = (idx - px) / w;
-      if (px < minX) minX = px;
-      if (py < minY) minY = py;
-      if (px > maxX) maxX = px;
-      if (py > maxY) maxY = py;
-
-      for (let dy = -1; dy <= 1; dy++) {
-        const ny = py + dy;
-        if (ny < 0 || ny >= h) continue;
-        for (let dx = -1; dx <= 1; dx++) {
-          if (dx === 0 && dy === 0) continue;
-          const nx = px + dx;
-          if (nx < 0 || nx >= w) continue;
-          const ni = ny * w + nx;
-          if (labels[ni] === -1 && binary[ni] === 255) stack.push(ni);
-        }
-      }
-    }
-
-    components.push({
-      label,
-      area,
-      bbox: { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 },
-    });
-  }
-
-  // Zero out tiny noise components
-  const filtered = components.filter((c) => c.area >= minArea);
-  const validLabels = new Set(filtered.map((c) => c.label));
-  for (let i = 0; i < labels.length; i++) {
-    if (labels[i] >= 0 && !validLabels.has(labels[i])) labels[i] = -1;
-  }
-
-  return { labels, components: filtered, width: w, height: h };
-}
 
 // ─── Vision bbox → component matching ─────────────────────────────────────────
 
@@ -299,7 +218,20 @@ export async function processPangramLocally(
   }
 
   // 3. Recognize characters via Google Vision API
-  const annotation = await callVisionAPI(imageBlob);
+  // Downscale the original image to the preprocessed dimensions before sending
+  // to Vision API. The original imageBlob can be 3-5MB; this produces a ~100-200KB JPEG.
+  const visionBitmap = await createImageBitmap(imageBlob);
+  const visionCanvas = new OffscreenCanvas(width, height);
+  const visionCtx = visionCanvas.getContext("2d")!;
+  visionCtx.drawImage(visionBitmap, 0, 0, width, height);
+  const visionBlob = await visionCanvas.convertToBlob({ type: "image/jpeg", quality: 0.85 });
+  visionBitmap.close();
+
+  console.log(
+    `[Pipeline] Vision API blob: ${(visionBlob.size / 1024).toFixed(0)}KB (downscaled from ${(imageBlob.size / 1024).toFixed(0)}KB)`,
+  );
+
+  const annotation = await callVisionAPI(visionBlob);
   const { chars: rawRecognizedChars, pageWidth, pageHeight } =
     extractRecognizedChars(annotation);
 
@@ -352,13 +284,16 @@ export async function processPangramLocally(
     debug.charCount = charBitmaps.length;
   }
 
-  // 3. Vectorize each character
+  // 3. Vectorize each character (concurrently)
+  const vectorResults = await Promise.all(
+    charBitmaps.map(async ({ char, binary: charBin, width: cw, height: ch }) => {
+      const vectorized = await vectorizeGlyph(charBin, cw, ch);
+      return vectorized.paths.length > 0 ? [char, vectorized] as const : null;
+    })
+  );
   const glyphs: Record<string, VectorizedGlyph> = {};
-  for (const { char, binary: charBin, width: cw, height: ch } of charBitmaps) {
-    const vectorized = await vectorizeGlyph(charBin, cw, ch);
-    if (vectorized.paths.length > 0) {
-      glyphs[char] = vectorized;
-    }
+  for (const r of vectorResults) {
+    if (r) glyphs[r[0]] = r[1];
   }
 
   if (Object.keys(glyphs).length === 0) {
@@ -388,25 +323,27 @@ export async function processDrawnGlyphsLocally(
   // Ensure potrace is ready
   await initPotrace();
 
+  const drawnResults = await Promise.all(
+    Object.entries(glyphImages).map(async ([char, blob]) => {
+      // 1. Preprocess
+      const { binary, width, height } = await preprocessGlyph(blob);
+
+      // 2. Extract & center
+      const extracted = extractSingleGlyph(binary, width, height);
+
+      // 3. Vectorize
+      const vectorized = await vectorizeGlyph(
+        extracted.binary,
+        extracted.width,
+        extracted.height,
+      );
+
+      return vectorized.paths.length > 0 ? [char.toLowerCase(), vectorized] as const : null;
+    })
+  );
   const glyphs: Record<string, VectorizedGlyph> = {};
-
-  for (const [char, blob] of Object.entries(glyphImages)) {
-    // 1. Preprocess
-    const { binary, width, height } = await preprocessGlyph(blob);
-
-    // 2. Extract & center
-    const extracted = extractSingleGlyph(binary, width, height);
-
-    // 3. Vectorize
-    const vectorized = await vectorizeGlyph(
-      extracted.binary,
-      extracted.width,
-      extracted.height,
-    );
-
-    if (vectorized.paths.length > 0) {
-      glyphs[char.toLowerCase()] = vectorized;
-    }
+  for (const r of drawnResults) {
+    if (r) glyphs[r[0]] = r[1];
   }
 
   if (Object.keys(glyphs).length === 0) {

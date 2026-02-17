@@ -35,6 +35,8 @@ export default function Home() {
   const [mounted, setMounted] = useState(false);
   const playgroundRef = useRef<TextPlaygroundHandle>(null);
 
+  const collectDebug = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("debug");
+
   // Avoid SSR opacity:0 — only animate after hydration
   useEffect(() => {
     setMounted(true);
@@ -51,13 +53,12 @@ export default function Home() {
       setProcessingStep(0);
       setError(null);
 
-      try {
-        const stepTimer = setInterval(() => {
-          setProcessingStep((s) => Math.min(s + 1, 3));
-        }, 800);
+      const stepTimer = setInterval(() => {
+        setProcessingStep((s) => Math.min(s + 1, 3));
+      }, 800);
 
-        const result = await processPangramLocally(file, pangram, true);
-        clearInterval(stepTimer);
+      try {
+        const result = await processPangramLocally(file, pangram, collectDebug);
         setProcessingStep(3);
 
         setFontResult(result);
@@ -70,6 +71,8 @@ export default function Home() {
       } catch (err) {
         setError(err instanceof Error ? err.message : "Something went wrong");
         setStep("input");
+      } finally {
+        clearInterval(stepTimer);
       }
     },
     []
@@ -81,13 +84,12 @@ export default function Home() {
       setProcessingStep(0);
       setError(null);
 
-      try {
-        const stepTimer = setInterval(() => {
-          setProcessingStep((s) => Math.min(s + 1, 3));
-        }, 600);
+      const stepTimer = setInterval(() => {
+        setProcessingStep((s) => Math.min(s + 1, 3));
+      }, 600);
 
+      try {
         const result = await processDrawnGlyphsLocally(glyphImages);
-        clearInterval(stepTimer);
         setProcessingStep(3);
 
         setFontResult(result);
@@ -99,6 +101,8 @@ export default function Home() {
       } catch (err) {
         setError(err instanceof Error ? err.message : "Something went wrong");
         setStep("input");
+      } finally {
+        clearInterval(stepTimer);
       }
     },
     []
@@ -243,7 +247,9 @@ export default function Home() {
                 charsFound={charsFound}
                 onExportImage={() => {
                   const el = playgroundRef.current?.getDisplayElement();
-                  if (el) exportElementAsImage(el);
+                  if (el) exportElementAsImage(el).catch(() => {
+                    alert("Failed to save image. Please try again.");
+                  });
                 }}
               />
               {debugData && <DebugOverlay debug={debugData} />}

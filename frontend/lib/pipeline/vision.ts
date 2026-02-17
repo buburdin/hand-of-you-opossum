@@ -90,10 +90,12 @@ export async function callVisionAPI(
   // Convert blob to base64
   const buffer = await imageBlob.arrayBuffer();
   const bytes = new Uint8Array(buffer);
-  let binaryStr = "";
-  for (let i = 0; i < bytes.length; i++) {
-    binaryStr += String.fromCharCode(bytes[i]);
+  const chunks: string[] = [];
+  const CHUNK = 8192;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    chunks.push(String.fromCharCode(...bytes.subarray(i, i + CHUNK)));
   }
+  const binaryStr = chunks.join("");
   const base64 = btoa(binaryStr);
 
   // Call our Next.js API route (keeps API key server-side)
@@ -118,6 +120,10 @@ export async function callVisionAPI(
     throw new Error(
       "Vision API returned no text. Make sure the image contains visible handwriting.",
     );
+  }
+
+  if (!Array.isArray(annotation.pages) || annotation.pages.length === 0) {
+    throw new Error("Vision API returned an unexpected response format.");
   }
 
   return annotation as FullTextAnnotation;
