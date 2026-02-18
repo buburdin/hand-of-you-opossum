@@ -9,10 +9,12 @@ let currentFontFormat: "truetype" | "woff2" = "truetype";
  */
 function arrayBufferToDataUrl(buffer: ArrayBuffer, mimeType: string): string {
   const bytes = new Uint8Array(buffer);
-  let binary = "";
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
+  const chunks: string[] = [];
+  const CHUNK = 8192;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    chunks.push(String.fromCharCode(...bytes.subarray(i, i + CHUNK)));
   }
+  const binary = chunks.join("");
   return `data:${mimeType};base64,${btoa(binary)}`;
 }
 

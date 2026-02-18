@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, forwardRef, useImperativeHandle } from "react";
+import { useState, useRef, useMemo, forwardRef, useImperativeHandle } from "react";
 import { motion } from "framer-motion";
 import { getFontFamilyName } from "@/lib/fontLoader";
 
@@ -12,19 +12,37 @@ export interface TextPlaygroundHandle {
   getDisplayElement: () => HTMLElement | null;
 }
 
-const SAMPLE_TEXTS = [
-  "the quick brown fox jumps over the lazy dog",
-  "hello world, this is my handwriting!",
-  "abcdefghijklmnopqrstuvwxyz",
-  "pack my box with five dozen liquor jugs",
+const ROTATING_TEXTS = [
+  "sir this is a wendy's",
+  "autocorrect can't save you here",
+  "somewhere between chaos and cursive",
+  "this is my handwriting and i'm not sorry",
+  "the quick brown fox got a restraining order",
+  "pack my box with five dozen existential crises",
+  "i write like a doctor but on purpose",
+  "you could've just used arial but here we are",
+  "i made a font instead of going to therapy",
+  "this font knows where you live",
+  "handmade in a machine-made world",
+  "a love letter to imperfection",
+  "congrats, you're a type designer now",
+  "type anything, it'll look like you wrote it",
+  "OK",
+  "well, you tried",
 ];
+
+function pickRandom<T>(arr: T[], count: number): T[] {
+  const shuffled = [...arr].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, count);
+}
 
 const TextPlayground = forwardRef<TextPlaygroundHandle, TextPlaygroundProps>(
   function TextPlayground({ fontLoaded }, ref) {
-  const [text, setText] = useState("hello world, this is my handwriting!");
+  const [text, setText] = useState("this is my handwriting and i'm not sorry");
   const [fontSize, setFontSize] = useState(36);
   const textDisplayRef = useRef<HTMLDivElement>(null);
   const fontFamily = getFontFamilyName();
+  const sampleTexts = useMemo(() => [...pickRandom(ROTATING_TEXTS, 3), "abcdefghijklmnopqrstuvwxyz"], []);
 
   useImperativeHandle(ref, () => ({
     getDisplayElement: () => textDisplayRef.current,
@@ -40,45 +58,37 @@ const TextPlayground = forwardRef<TextPlaygroundHandle, TextPlaygroundProps>(
       <div className="text-center space-y-1">
         <h2 className="text-sm font-medium tracking-wide">your font is ready</h2>
         <p className="text-[10px] uppercase tracking-[0.2em] text-fg/35">
-          type anything below
+          type on the note
         </p>
       </div>
 
-      {/* Text display area */}
+      {/* Sticky note — type directly on it */}
       <div
         ref={textDisplayRef}
-        className={`w-full aspect-square p-8 rounded-none border ${
+        className={`relative w-full aspect-square rounded-none border ${
           fontLoaded ? "sticky-note" : "border-border bg-surface"
         }`}
         style={{
           boxShadow: fontLoaded ? "var(--shadow-sticky)" : "var(--shadow-md)",
         }}
       >
-        <div
-          className="font-preview break-words"
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="start typing..."
+          className="absolute inset-0 w-full h-full resize-none bg-transparent border-0 outline-none font-preview break-words p-8 pb-14 placeholder:opacity-30"
           style={{
             fontFamily: fontLoaded ? `"${fontFamily}", sans-serif` : "inherit",
             fontSize: `${fontSize}px`,
             lineHeight: 1.5,
           }}
-        >
-          {text || (
-            <span className={fontLoaded ? "text-ink/20" : "text-fg/20"}>
-              start typing...
-            </span>
-          )}
-        </div>
+        />
+        {fontLoaded && (
+          <span className="absolute bottom-3 right-4 text-[11px] tracking-[0.15em] text-ink/35 select-none pointer-events-none">
+            handofyou.app
+          </span>
+        )}
       </div>
-
-      {/* Text input */}
-      <textarea
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        placeholder="type something..."
-        rows={2}
-        className="w-full px-4 py-3 rounded-lg border border-border bg-transparent text-sm resize-none focus:outline-none focus:border-fg/30 transition-colors font-mono"
-        style={{ boxShadow: "var(--shadow-sm)" }}
-      />
 
       {/* Font size slider */}
       <div className="flex items-center gap-4 w-full">
@@ -100,7 +110,7 @@ const TextPlayground = forwardRef<TextPlaygroundHandle, TextPlaygroundProps>(
 
       {/* Sample text pills */}
       <div className="flex flex-wrap gap-2 justify-center">
-        {SAMPLE_TEXTS.map((sample) => (
+        {sampleTexts.map((sample) => (
           <button
             key={sample}
             onClick={() => setText(sample)}

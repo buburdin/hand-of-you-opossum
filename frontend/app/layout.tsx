@@ -12,6 +12,19 @@ export const metadata: Metadata = {
   title: "Hand of You",
   description: "Turn your handwriting into a font. Snap, draw, type.",
   manifest: "/manifest.json",
+  metadataBase: new URL("https://handofyou.app"),
+  openGraph: {
+    title: "Hand of You — turn your handwriting into a font",
+    description: "snap a photo or draw letters. instant font, no signup.",
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: "Hand of You" }],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Hand of You — turn your handwriting into a font",
+    description: "snap a photo or draw letters. instant font, no signup.",
+    images: ["/og.png"],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",

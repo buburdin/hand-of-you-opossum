@@ -7,7 +7,7 @@ import PangramCapture from "@/components/PangramCapture";
 import DrawCanvas from "@/components/DrawCanvas";
 import ProcessingAnimation from "@/components/ProcessingAnimation";
 import TextPlayground, { type TextPlaygroundHandle } from "@/components/TextPlayground";
-import FontExport, { exportElementAsImage } from "@/components/FontExport";
+import FontExport, { exportElementAsImage, shareSticker } from "@/components/FontExport";
 import ThemeToggle from "@/components/ThemeToggle";
 import {
   processPangramLocally,
@@ -33,7 +33,10 @@ export default function Home() {
   const [debugData, setDebugData] = useState<PipelineDebugData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
   const playgroundRef = useRef<TextPlaygroundHandle>(null);
+
+  const collectDebug = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("debug");
 
   // Avoid SSR opacity:0 — only animate after hydration
   useEffect(() => {
@@ -51,13 +54,12 @@ export default function Home() {
       setProcessingStep(0);
       setError(null);
 
-      try {
-        const stepTimer = setInterval(() => {
-          setProcessingStep((s) => Math.min(s + 1, 3));
-        }, 800);
+      const stepTimer = setInterval(() => {
+        setProcessingStep((s) => Math.min(s + 1, 3));
+      }, 800);
 
-        const result = await processPangramLocally(file, pangram, true);
-        clearInterval(stepTimer);
+      try {
+        const result = await processPangramLocally(file, pangram, collectDebug);
         setProcessingStep(3);
 
         setFontResult(result);
@@ -70,6 +72,8 @@ export default function Home() {
       } catch (err) {
         setError(err instanceof Error ? err.message : "Something went wrong");
         setStep("input");
+      } finally {
+        clearInterval(stepTimer);
       }
     },
     []
@@ -81,13 +85,12 @@ export default function Home() {
       setProcessingStep(0);
       setError(null);
 
-      try {
-        const stepTimer = setInterval(() => {
-          setProcessingStep((s) => Math.min(s + 1, 3));
-        }, 600);
+      const stepTimer = setInterval(() => {
+        setProcessingStep((s) => Math.min(s + 1, 3));
+      }, 600);
 
+      try {
         const result = await processDrawnGlyphsLocally(glyphImages);
-        clearInterval(stepTimer);
         setProcessingStep(3);
 
         setFontResult(result);
@@ -99,6 +102,8 @@ export default function Home() {
       } catch (err) {
         setError(err instanceof Error ? err.message : "Something went wrong");
         setStep("input");
+      } finally {
+        clearInterval(stepTimer);
       }
     },
     []
@@ -243,19 +248,59 @@ export default function Home() {
                 charsFound={charsFound}
                 onExportImage={() => {
                   const el = playgroundRef.current?.getDisplayElement();
-                  if (el) exportElementAsImage(el);
+                  if (el) exportElementAsImage(el).catch(() => {
+                    alert("Failed to save image. Please try again.");
+                  });
+                }}
+                onShare={async () => {
+                  const el = playgroundRef.current?.getDisplayElement();
+                  if (!el) return;
+                  const result = await shareSticker(el);
+                  if (result === "copied") {
+                    setToast("image copied to clipboard");
+                    setTimeout(() => setToast(null), 2500);
+                  }
                 }}
               />
-              {debugData && <DebugOverlay debug={debugData} />}
+              {debugData ? (
+                <DebugOverlay debug={debugData} />
+              ) : (
+                <div className="w-full max-w-2xl mx-auto">
+                  <a
+                    href="/?debug"
+                    className="flex items-center justify-center gap-2 text-[10px] uppercase tracking-[0.2em] text-fg/35 hover:text-fg/60 transition-colors"
+                  >
+                    Pipeline debug: add ?debug to URL and process again to see pipeline stages
+                  </a>
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
       </main>
 
       {/* Footer */}
-      <footer className="mt-16 text-[9px] uppercase tracking-[0.3em] text-fg/15">
-        hand of you &middot; 2026
+      <footer className="mt-16 text-[9px] uppercase tracking-[0.3em] text-fg">
+        <a href="https://x.com/buburdin" target="_blank" rel="noopener noreferrer" className="hover:opacity-60 transition-opacity">Alex Burdin</a>
+        {" & "}
+        <a href="https://github.com/joi-rio" target="_blank" rel="noopener noreferrer" className="hover:opacity-60 transition-opacity">Joi Rio</a>
       </footer>
+
+      {/* Toast */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            transition={{ type: "spring", stiffness: 500, damping: 35 }}
+            className="fixed bottom-8 left-1/2 -translate-x-1/2 px-5 py-2.5 rounded-full bg-fg text-bg text-xs tracking-wide"
+            style={{ boxShadow: "var(--shadow-lg)" }}
+          >
+            {toast}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

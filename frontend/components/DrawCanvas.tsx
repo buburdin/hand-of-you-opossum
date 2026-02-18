@@ -131,9 +131,12 @@ export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
     const canvas = canvasRef.current;
     if (!canvas || !hasContent) return;
 
-    const blob = await new Promise<Blob>((resolve) => {
+    const blob = await new Promise<Blob>((resolve, reject) => {
       canvas.toBlob(
-        (b) => resolve(b!),
+        (b) => {
+          if (b) resolve(b);
+          else reject(new Error("Failed to capture canvas as image"));
+        },
         "image/png"
       );
     });
