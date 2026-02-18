@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 
 type Theme = "light" | "night";
 
 const STORAGE_KEY = "hoy-theme";
+const OVERRIDE_KEY = "hoy-theme-manual";
 const THEME_COLORS: Record<Theme, string> = {
   light: "#fafaf8",
   night: "#0f1113",
@@ -21,33 +22,60 @@ function applyTheme(theme: Theme) {
   }
 }
 
-function getInitialTheme(): Theme {
-  const stored = window.localStorage.getItem(STORAGE_KEY);
-  if (stored === "light" || stored === "night") {
-    return stored;
-  }
+function systemTheme(): Theme {
   return window.matchMedia("(prefers-color-scheme: dark)").matches
     ? "night"
     : "light";
 }
 
+function getInitialTheme(): Theme {
+  if (window.localStorage.getItem(OVERRIDE_KEY)) {
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    if (stored === "light" || stored === "night") return stored;
+  }
+  return systemTheme();
+}
+
 export default function ThemeToggle() {
   const [theme, setTheme] = useState<Theme>("light");
   const [mounted, setMounted] = useState(false);
+  const hasManualOverride = useRef(false);
 
   useEffect(() => {
     setMounted(true);
+    hasManualOverride.current = !!window.localStorage.getItem(OVERRIDE_KEY);
     const initial = getInitialTheme();
     setTheme(initial);
     applyTheme(initial);
+
+    const mql = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleChange = (e: MediaQueryListEvent) => {
+      if (hasManualOverride.current) return;
+      const next: Theme = e.matches ? "night" : "light";
+      setTheme(next);
+      applyTheme(next);
+    };
+    mql.addEventListener("change", handleChange);
+    return () => mql.removeEventListener("change", handleChange);
   }, []);
 
-  const toggleTheme = () => {
-    const next: Theme = theme === "night" ? "light" : "night";
-    setTheme(next);
-    window.localStorage.setItem(STORAGE_KEY, next);
-    applyTheme(next);
-  };
+  const toggleTheme = useCallback(() => {
+    setTheme((prev) => {
+      const next: Theme = prev === "night" ? "light" : "night";
+      const matchesSystem = next === systemTheme();
+      if (matchesSystem) {
+        window.localStorage.removeItem(STORAGE_KEY);
+        window.localStorage.removeItem(OVERRIDE_KEY);
+        hasManualOverride.current = false;
+      } else {
+        window.localStorage.setItem(STORAGE_KEY, next);
+        window.localStorage.setItem(OVERRIDE_KEY, "1");
+        hasManualOverride.current = true;
+      }
+      applyTheme(next);
+      return next;
+    });
+  }, []);
 
   const isNight = theme === "night";
 

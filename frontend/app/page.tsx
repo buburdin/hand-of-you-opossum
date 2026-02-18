@@ -7,7 +7,7 @@ import PangramCapture from "@/components/PangramCapture";
 import DrawCanvas from "@/components/DrawCanvas";
 import ProcessingAnimation from "@/components/ProcessingAnimation";
 import TextPlayground, { type TextPlaygroundHandle } from "@/components/TextPlayground";
-import FontExport, { exportElementAsImage } from "@/components/FontExport";
+import FontExport, { exportElementAsImage, shareSticker } from "@/components/FontExport";
 import ThemeToggle from "@/components/ThemeToggle";
 import {
   processPangramLocally,
@@ -33,6 +33,7 @@ export default function Home() {
   const [debugData, setDebugData] = useState<PipelineDebugData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
   const playgroundRef = useRef<TextPlaygroundHandle>(null);
 
   const collectDebug = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("debug");
@@ -251,6 +252,15 @@ export default function Home() {
                     alert("Failed to save image. Please try again.");
                   });
                 }}
+                onShare={async () => {
+                  const el = playgroundRef.current?.getDisplayElement();
+                  if (!el) return;
+                  const result = await shareSticker(el);
+                  if (result === "copied") {
+                    setToast("image copied to clipboard");
+                    setTimeout(() => setToast(null), 2500);
+                  }
+                }}
               />
               {debugData && <DebugOverlay debug={debugData} />}
             </motion.div>
@@ -259,9 +269,27 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="mt-16 text-[9px] uppercase tracking-[0.3em] text-fg/15">
-        hand of you &middot; 2026
+      <footer className="mt-16 text-[9px] uppercase tracking-[0.3em] text-fg">
+        <a href="https://x.com/buburdin" target="_blank" rel="noopener noreferrer" className="hover:opacity-60 transition-opacity">Alex Burdin</a>
+        {" & "}
+        <a href="https://github.com/joi-rio" target="_blank" rel="noopener noreferrer" className="hover:opacity-60 transition-opacity">Joi Rio</a>
       </footer>
+
+      {/* Toast */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            transition={{ type: "spring", stiffness: 500, damping: 35 }}
+            className="fixed bottom-8 left-1/2 -translate-x-1/2 px-5 py-2.5 rounded-full bg-fg text-bg text-xs tracking-wide"
+            style={{ boxShadow: "var(--shadow-lg)" }}
+          >
+            {toast}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
