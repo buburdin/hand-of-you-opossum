@@ -45,3 +45,4 @@ Add `const debug = new URLSearchParams(window.location.search).has('debug')` and
 | Date | Action | Learnings |
 |------|--------|-----------|
 | 2026-02-17 | Created during code review | |
+| 2026-02-18 | Resolved in commit 42facad: debug gated behind `?debug` URL param (Option B). Reason: avoid 4 PNG encodes per run when panel is unused (~200–800ms). To enable again: open app with `?debug` (e.g. `/?debug`) and run pipeline (snap/draw → process); debug overlay then appears on playground. | |
