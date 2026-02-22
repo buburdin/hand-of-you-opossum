@@ -26,12 +26,17 @@ const TIP_OPTIONS = [
   { label: "flat", value: "square" as CanvasLineCap },
 ] as const;
 
+const MIN_POINT_DISTANCE_SQ = 0.25;
+
 export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
+  const lastPointRef = useRef<{ x: number; y: number; midX?: number; midY?: number } | null>(null);
+  const isDrawingRef = useRef(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [drawnGlyphs, setDrawnGlyphs] = useState<Record<string, Blob>>({});
-  const [isDrawing, setIsDrawing] = useState(false);
   const [hasContent, setHasContent] = useState(false);
+  // isDrawingRef used for hot path; no UI depends on isDrawing
 
   // Brush settings
   const [thickness, setThickness] = useState(4);
@@ -42,62 +47,61 @@ export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
   const currentLetter = ALL_LETTERS[currentIndex];
   const progress = Object.keys(drawnGlyphs).length / ALL_LETTERS.length;
 
-  // Initialize canvas
-  useEffect(() => {
+  const clearCanvasSurface = useCallback(() => {
+    const ctx = ctxRef.current;
+    if (!ctx) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
-
-    const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    ctx.scale(dpr, dpr);
-    clearCanvas();
-  }, [currentIndex]);
-
-  const clearCanvas = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
     const rect = canvas.getBoundingClientRect();
     ctx.clearRect(0, 0, rect.width, rect.height);
     // Fill with white so the exported PNG has a white background
     // (transparent pixels decode as black in OpenCV, breaking threshold inversion)
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, rect.width, rect.height);
-    setHasContent(false);
   }, []);
 
-  const getPos = (e: React.TouchEvent | React.MouseEvent) => {
+  const clearCanvas = useCallback(() => {
+    clearCanvasSurface();
+    setHasContent(false);
+    lastPointRef.current = null;
+    isDrawingRef.current = false;
+  }, [clearCanvasSurface]);
+
+  // Initialize canvas
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = Math.floor(rect.width * dpr);
+    canvas.height = Math.floor(rect.height * dpr);
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctxRef.current = ctx;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    clearCanvasSurface();
+    lastPointRef.current = null;
+    isDrawingRef.current = false;
+  }, [clearCanvasSurface, currentIndex]);
+
+  const getPos = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
-
-    if ("touches" in e) {
-      return {
-        x: e.touches[0].clientX - rect.left,
-        y: e.touches[0].clientY - rect.top,
-      };
-    }
     return {
-      x: (e as React.MouseEvent).clientX - rect.left,
-      y: (e as React.MouseEvent).clientY - rect.top,
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
     };
   };
 
-  const startDraw = (e: React.TouchEvent | React.MouseEvent) => {
-    e.preventDefault();
-    setIsDrawing(true);
+  const startDraw = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    isDrawingRef.current = true;
     setHasContent(true);
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
+    const ctx = ctxRef.current;
     if (!ctx) return;
 
     const { x, y } = getPos(e);
@@ -106,25 +110,63 @@ export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
     ctx.strokeStyle = `rgba(26, 26, 26, ${opacity})`;
     ctx.lineWidth = thickness;
     ctx.lineCap = tip;
-    ctx.lineJoin = tip === "round" ? "round" : "miter";
+    ctx.lineJoin = "round";
+    lastPointRef.current = { x, y };
   };
 
-  const draw = (e: React.TouchEvent | React.MouseEvent) => {
-    e.preventDefault();
-    if (!isDrawing) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
+  const draw = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!isDrawingRef.current) return;
+    const ctx = ctxRef.current;
     if (!ctx) return;
 
     const { x, y } = getPos(e);
-    ctx.lineTo(x, y);
+    const prev = lastPointRef.current;
+    if (!prev) {
+      ctx.lineTo(x, y);
+      ctx.stroke();
+      lastPointRef.current = { x, y };
+      return;
+    }
+
+    const dx = x - prev.x;
+    const dy = y - prev.y;
+    if (dx * dx + dy * dy < MIN_POINT_DISTANCE_SQ) return;
+
+    const midX = (prev.x + x) / 2;
+    const midY = (prev.y + y) / 2;
+
+    ctx.beginPath();
+    ctx.moveTo(prev.midX ?? prev.x, prev.midY ?? prev.y);
+    ctx.quadraticCurveTo(prev.x, prev.y, midX, midY);
     ctx.stroke();
+
+    lastPointRef.current = { x, y, midX, midY };
   };
 
-  const endDraw = (e: React.TouchEvent | React.MouseEvent) => {
-    e.preventDefault();
-    setIsDrawing(false);
+  const endDraw = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (isDrawingRef.current) {
+      const ctx = ctxRef.current;
+      const last = lastPointRef.current;
+      const endPos = getPos(e);
+      if (ctx && last) {
+        const finalPoint = { x: endPos.x, y: endPos.y };
+        const dx = finalPoint.x - last.x;
+        const dy = finalPoint.y - last.y;
+        if (dx * dx + dy * dy < MIN_POINT_DISTANCE_SQ) {
+          ctx.beginPath();
+          ctx.arc(last.x, last.y, thickness / 2, 0, Math.PI * 2);
+          ctx.fillStyle = ctx.strokeStyle;
+          ctx.fill();
+        } else {
+          ctx.beginPath();
+          ctx.moveTo(last.midX ?? last.x, last.midY ?? last.y);
+          ctx.quadraticCurveTo(last.x, last.y, finalPoint.x, finalPoint.y);
+          ctx.stroke();
+        }
+      }
+    }
+    isDrawingRef.current = false;
+    lastPointRef.current = null;
   };
 
   const saveAndNext = useCallback(async () => {
@@ -230,13 +272,12 @@ export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
         <canvas
           ref={canvasRef}
           className="w-full h-full"
-          onMouseDown={startDraw}
-          onMouseMove={draw}
-          onMouseUp={endDraw}
-          onMouseLeave={endDraw}
-          onTouchStart={startDraw}
-          onTouchMove={draw}
-          onTouchEnd={endDraw}
+          style={{ touchAction: "none" }}
+          onPointerDown={startDraw}
+          onPointerMove={draw}
+          onPointerUp={endDraw}
+          onPointerCancel={endDraw}
+          onPointerLeave={endDraw}
         />
         {/* Guide letter (faint) */}
         {!hasContent && (
