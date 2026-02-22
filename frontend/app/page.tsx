@@ -293,7 +293,7 @@ export default function Home() {
       <footer className="mt-16 text-[9px] uppercase tracking-[0.3em] text-fg">
         <a href="https://x.com/buburdin" target="_blank" rel="noopener noreferrer" className="hover:opacity-60 transition-opacity">Alex Burdin</a>
         {" & "}
-        <a href="https://github.com/joi-rio" target="_blank" rel="noopener noreferrer" className="hover:opacity-60 transition-opacity">Max Yugi</a>
+        <a href="https://x.com/maxyugio" target="_blank" rel="noopener noreferrer" className="hover:opacity-60 transition-opacity">Max Yugi</a>
       </footer>
 
       {/* Toast */}
