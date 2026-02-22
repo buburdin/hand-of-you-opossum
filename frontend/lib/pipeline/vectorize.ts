@@ -81,6 +81,19 @@ export function extractSvgViewBox(
   return null;
 }
 
+/**
+ * Extract the scale factor from potrace's `<g transform="... scale(Sx,Sy)">`.
+ * Potrace uses scale(unit, -unit) where unit is typically 0.1 for SVG output,
+ * meaning path coordinates are in 10x pixel space.
+ */
+export function extractPotraceScale(svgString: string): number | null {
+  const match = svgString.match(/scale\(\s*(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)\s*\)/);
+  if (match) {
+    return Math.abs(parseFloat(match[1]));
+  }
+  return null;
+}
+
 export interface VectorizedGlyph {
   /** SVG path d-attribute strings (may be multiple for compound chars like "i") */
   paths: string[];
@@ -88,6 +101,8 @@ export interface VectorizedGlyph {
   sourceWidth: number;
   /** Original bitmap height in pixels */
   sourceHeight: number;
+  /** Potrace SVG canvas height (in potrace's internal coordinate space) */
+  potraceHeight?: number;
 }
 
 /**
@@ -123,9 +138,20 @@ export async function vectorizeGlyph(
   // Extract raw path data — already Y-UP from potrace's internal transform
   const paths = extractSvgPaths(svgString);
 
+  // Capture potrace canvas height in PATH coordinate space (not SVG pixel space).
+  // Potrace uses <g transform="translate(0,H) scale(S,-S)"> where S is typically 0.1,
+  // meaning path coordinates are 10x the pixel coordinates.
+  // potraceHeight must be in the same space as the path coords: H / S.
+  const viewBox = extractSvgViewBox(svgString);
+  const scaleFactor = extractPotraceScale(svgString);
+  const potraceHeight = viewBox && scaleFactor
+    ? viewBox.height / scaleFactor   // e.g. 756 / 0.1 = 7560
+    : undefined;
+
   return {
     paths,
     sourceWidth: width,
     sourceHeight: height,
+    potraceHeight,
   };
 }

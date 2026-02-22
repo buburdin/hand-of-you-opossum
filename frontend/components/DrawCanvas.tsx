@@ -2,11 +2,36 @@
 
 import { useRef, useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ALL_LETTERS } from "@/lib/pangrams";
+import { getStroke } from "perfect-freehand";
+import { ALL_LETTERS, GUIDE_LINES } from "@/lib/pangrams";
+
+/** Turns perfect-freehand outline points into an SVG path string for Path2D/fill. */
+function getSvgPathFromStroke(points: number[][], closed = true): string {
+  const len = points.length;
+  if (len < 4) return "";
+  const avg = (a: number, b: number) => (a + b) / 2;
+  let a = points[0];
+  let b = points[1];
+  const c = points[2];
+  let result = `M${a[0].toFixed(2)},${a[1].toFixed(2)} Q${b[0].toFixed(2)},${b[1].toFixed(2)} ${avg(b[0], c[0]).toFixed(2)},${avg(b[1], c[1]).toFixed(2)} T`;
+  for (let i = 2, max = len - 1; i < max; i++) {
+    a = points[i];
+    b = points[i + 1];
+    result += `${avg(a[0], b[0]).toFixed(2)},${avg(a[1], b[1]).toFixed(2)} `;
+  }
+  return result + (closed ? "Z" : "");
+}
 
 interface DrawCanvasProps {
   onComplete: (glyphImages: Record<string, Blob>) => void;
+  initialGlyphs?: Record<string, Blob>;
+  onGlyphsChange?: (glyphs: Record<string, Blob>) => void;
 }
+
+/** Ghost letter font-size in container-query-height units so it scales with the canvas.
+ *  Calibrated for JetBrains Mono (ascender 1020, descender -300, x-height 536, UPM 1000)
+ *  so that lowercase x-height ≈ the x-height guide line (30%) and caps fill to near the top. */
+const GHOST_FONT_SIZE = '77cqh';
 
 const THICKNESS_OPTIONS = [
   { label: "S", value: 2 },
@@ -26,15 +51,32 @@ const TIP_OPTIONS = [
   { label: "flat", value: "square" as CanvasLineCap },
 ] as const;
 
-export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
+interface CompletedStroke {
+  pathData: string;
+  fillStyle: string;
+}
+
+export default function DrawCanvas({ onComplete, initialGlyphs, onGlyphsChange }: DrawCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
+  const currentStrokePointsRef = useRef<[number, number, number][]>([]);
+  const isDrawingRef = useRef(false);
+  const completedStrokesRef = useRef<CompletedStroke[]>([]);
+  const backgroundImageRef = useRef<HTMLImageElement | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [drawnGlyphs, setDrawnGlyphs] = useState<Record<string, Blob>>({});
-  const [isDrawing, setIsDrawing] = useState(false);
+  const [drawnGlyphs, setDrawnGlyphs] = useState<Record<string, Blob>>(initialGlyphs ?? {});
   const [hasContent, setHasContent] = useState(false);
 
+  // Refs to avoid stale closures in async save callbacks
+  const drawnGlyphsRef = useRef(drawnGlyphs);
+  drawnGlyphsRef.current = drawnGlyphs;
+  const hasContentRef = useRef(hasContent);
+  hasContentRef.current = hasContent;
+  const currentIndexRef = useRef(currentIndex);
+  currentIndexRef.current = currentIndex;
+
   // Brush settings
-  const [thickness, setThickness] = useState(4);
+  const [thickness, setThickness] = useState(24);
   const [opacity, setOpacity] = useState(1);
   const [tip, setTip] = useState<CanvasLineCap>("round");
   const [showSettings, setShowSettings] = useState(false);
@@ -42,115 +84,229 @@ export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
   const currentLetter = ALL_LETTERS[currentIndex];
   const progress = Object.keys(drawnGlyphs).length / ALL_LETTERS.length;
 
-  // Initialize canvas
-  useEffect(() => {
+  const clearCanvasSurface = useCallback(() => {
+    const ctx = ctxRef.current;
+    if (!ctx) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
-
-    const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    ctx.scale(dpr, dpr);
-    clearCanvas();
-  }, [currentIndex]);
-
-  const clearCanvas = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
     const rect = canvas.getBoundingClientRect();
     ctx.clearRect(0, 0, rect.width, rect.height);
     // Fill with white so the exported PNG has a white background
     // (transparent pixels decode as black in OpenCV, breaking threshold inversion)
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, rect.width, rect.height);
-    setHasContent(false);
   }, []);
 
-  const getPos = (e: React.TouchEvent | React.MouseEvent) => {
+  const redrawAll = useCallback(() => {
+    const ctx = ctxRef.current;
+    const canvas = canvasRef.current;
+    if (!ctx || !canvas) return;
+    const rect = canvas.getBoundingClientRect();
+
+    // Clear to white
+    ctx.clearRect(0, 0, rect.width, rect.height);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, rect.width, rect.height);
+
+    // Draw restored background image if present
+    const bgImg = backgroundImageRef.current;
+    if (bgImg) {
+      ctx.drawImage(bgImg, 0, 0, rect.width, rect.height);
+    }
+
+    // Replay all completed strokes
+    for (const stroke of completedStrokesRef.current) {
+      const path = new Path2D(stroke.pathData);
+      ctx.fillStyle = stroke.fillStyle;
+      ctx.fill(path);
+    }
+  }, []);
+
+  const clearCanvas = useCallback(() => {
+    clearCanvasSurface();
+    completedStrokesRef.current = [];
+    backgroundImageRef.current = null;
+    setHasContent(false);
+    currentStrokePointsRef.current = [];
+    isDrawingRef.current = false;
+  }, [clearCanvasSurface]);
+
+  // Initialize canvas
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = Math.floor(rect.width * dpr);
+    canvas.height = Math.floor(rect.height * dpr);
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctxRef.current = ctx;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    clearCanvasSurface();
+    currentStrokePointsRef.current = [];
+    isDrawingRef.current = false;
+    completedStrokesRef.current = [];
+    backgroundImageRef.current = null;
+
+    // Restore previously saved glyph if it exists
+    const letter = ALL_LETTERS[currentIndex];
+    const savedBlob = drawnGlyphsRef.current[letter];
+    if (savedBlob) {
+      const url = URL.createObjectURL(savedBlob);
+      const img = new Image();
+      img.onload = () => {
+        backgroundImageRef.current = img;
+        redrawAll();
+        URL.revokeObjectURL(url);
+        setHasContent(true);
+      };
+      img.src = url;
+    } else {
+      setHasContent(false);
+    }
+  }, [clearCanvasSurface, redrawAll, currentIndex]);
+
+  const getPos = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
-
-    if ("touches" in e) {
-      return {
-        x: e.touches[0].clientX - rect.left,
-        y: e.touches[0].clientY - rect.top,
-      };
-    }
     return {
-      x: (e as React.MouseEvent).clientX - rect.left,
-      y: (e as React.MouseEvent).clientY - rect.top,
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
     };
   };
 
-  const startDraw = (e: React.TouchEvent | React.MouseEvent) => {
-    e.preventDefault();
-    setIsDrawing(true);
+  const renderCurrentStroke = useCallback(
+    (points: [number, number, number][], last: boolean) => {
+      const ctx = ctxRef.current;
+      if (!ctx || points.length < 2) return;
+      try {
+        const outline = getStroke(points, {
+          size: thickness,
+          thinning: 0.15,
+          smoothing: 0.5,
+          streamline: 0.6,
+          simulatePressure: false,
+          start: { taper: false },
+          end: { taper: false },
+          last,
+        });
+        if (outline.length < 4) return;
+        const pathData = getSvgPathFromStroke(outline);
+        return pathData;
+      } catch (err) {
+        console.error("[DrawCanvas] perfect-freehand error", err);
+        return undefined;
+      }
+    },
+    [thickness]
+  );
+
+  const startDraw = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    isDrawingRef.current = true;
     setHasContent(true);
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
+    const { x, y } = getPos(e);
+    const pressure = typeof e.pressure === "number" ? e.pressure : 0.5;
+    currentStrokePointsRef.current = [[x, y, pressure]];
+  };
+
+  const draw = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!isDrawingRef.current) return;
+    const ctx = ctxRef.current;
     if (!ctx) return;
 
     const { x, y } = getPos(e);
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.strokeStyle = `rgba(26, 26, 26, ${opacity})`;
-    ctx.lineWidth = thickness;
-    ctx.lineCap = tip;
-    ctx.lineJoin = tip === "round" ? "round" : "miter";
+    const pressure = typeof e.pressure === "number" ? e.pressure : 0.5;
+    const points = currentStrokePointsRef.current;
+    points.push([x, y, pressure]);
+
+    if (points.length >= 2) {
+      const pathData = renderCurrentStroke(points, false);
+      if (pathData) {
+        redrawAll();
+        const path = new Path2D(pathData);
+        ctx.fillStyle = `rgba(26, 26, 26, ${opacity})`;
+        ctx.fill(path);
+      }
+    }
   };
 
-  const draw = (e: React.TouchEvent | React.MouseEvent) => {
-    e.preventDefault();
-    if (!isDrawing) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
+  const endDraw = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!isDrawingRef.current) {
+      currentStrokePointsRef.current = [];
+      return;
+    }
+    const points = currentStrokePointsRef.current;
     const { x, y } = getPos(e);
-    ctx.lineTo(x, y);
-    ctx.stroke();
-  };
+    const pressure = typeof e.pressure === "number" ? e.pressure : 0.5;
+    points.push([x, y, pressure]);
 
-  const endDraw = (e: React.TouchEvent | React.MouseEvent) => {
-    e.preventDefault();
-    setIsDrawing(false);
-  };
+    const fillStyle = `rgba(26, 26, 26, ${opacity})`;
 
-  const saveAndNext = useCallback(async () => {
-    const canvas = canvasRef.current;
-    if (!canvas || !hasContent) return;
-
-    const blob = await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob(
-        (b) => {
-          if (b) resolve(b);
-          else reject(new Error("Failed to capture canvas as image"));
-        },
-        "image/png"
-      );
-    });
-
-    const newGlyphs = { ...drawnGlyphs, [currentLetter]: blob };
-    setDrawnGlyphs(newGlyphs);
-
-    if (currentIndex < ALL_LETTERS.length - 1) {
-      setCurrentIndex(currentIndex + 1);
+    if (points.length === 1) {
+      // Single-point dot — store as a circular path
+      const r = thickness / 2;
+      const pathData = `M${x + r},${y} A${r},${r} 0 1,1 ${x - r},${y} A${r},${r} 0 1,1 ${x + r},${y}Z`;
+      completedStrokesRef.current.push({ pathData, fillStyle });
     } else {
-      // All letters done
+      const pathData = renderCurrentStroke(points, true);
+      if (pathData) {
+        completedStrokesRef.current.push({ pathData, fillStyle });
+      }
+    }
+
+    redrawAll();
+    isDrawingRef.current = false;
+    currentStrokePointsRef.current = [];
+  };
+
+  /** Save current canvas content as a glyph blob (synchronous capture). */
+  const saveCurrent = useCallback((): Record<string, Blob> | null => {
+    const canvas = canvasRef.current;
+    if (!canvas || !hasContentRef.current) return null;
+
+    // Synchronous capture — avoids race conditions with canvas clearing
+    const dataUrl = canvas.toDataURL("image/png");
+    const byteStr = atob(dataUrl.split(",")[1]);
+    const buf = new Uint8Array(byteStr.length);
+    for (let i = 0; i < byteStr.length; i++) buf[i] = byteStr.charCodeAt(i);
+    const blob = new Blob([buf], { type: "image/png" });
+
+    const letter = ALL_LETTERS[currentIndexRef.current];
+    const newGlyphs = { ...drawnGlyphsRef.current, [letter]: blob };
+    drawnGlyphsRef.current = newGlyphs;
+    setDrawnGlyphs(newGlyphs);
+    onGlyphsChange?.(newGlyphs);
+    setHasContent(false);
+    return newGlyphs;
+  }, [onGlyphsChange]);
+
+  const saveAndNext = useCallback(() => {
+    const newGlyphs = saveCurrent();
+    if (!newGlyphs) return;
+
+    // Pick a random undrawn letter next
+    const undrawn = ALL_LETTERS
+      .map((l, i) => ({ l, i }))
+      .filter(({ l }) => !(l in newGlyphs));
+    if (undrawn.length > 0) {
+      const pick = undrawn[Math.floor(Math.random() * undrawn.length)];
+      setCurrentIndex(pick.i);
+    } else {
       onComplete(newGlyphs);
     }
-  }, [currentIndex, currentLetter, drawnGlyphs, hasContent, onComplete]);
+  }, [saveCurrent, onComplete]);
+
+  const goToLetter = useCallback((i: number) => {
+    if (i === currentIndexRef.current) return;
+    saveCurrent();
+    setCurrentIndex(i);
+  }, [saveCurrent]);
 
   // Keyboard shortcut: Enter → next/done
   useEffect(() => {
@@ -172,6 +328,14 @@ export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
     }
   };
 
+  const finishEarly = useCallback(() => {
+    // Save current letter if it has content, then complete
+    const glyphs = saveCurrent() ?? drawnGlyphsRef.current;
+    onComplete(glyphs);
+  }, [saveCurrent, onComplete]);
+
+  const canFinish = Object.keys(drawnGlyphs).length > 0 || hasContent;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -180,29 +344,6 @@ export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
       transition={{ type: "spring", stiffness: 400, damping: 30 }}
       className="flex flex-col items-center gap-6 w-full max-w-lg mx-auto"
     >
-      {/* Progress bar */}
-      <div className="w-full">
-        <div className="flex justify-between items-center mb-2">
-          <span className="text-[10px] uppercase tracking-[0.2em] text-fg/40">
-            {Object.keys(drawnGlyphs).length} / {ALL_LETTERS.length}
-          </span>
-          <button
-            onClick={skipLetter}
-            className="text-[10px] uppercase tracking-[0.15em] text-fg/30 hover:text-fg/60 transition-colors"
-          >
-            skip
-          </button>
-        </div>
-        <div className="w-full h-[2px] bg-border rounded-full overflow-hidden">
-          <motion.div
-            className="h-full bg-fg/60 rounded-full"
-            initial={{ width: 0 }}
-            animate={{ width: `${progress * 100}%` }}
-            transition={{ type: "spring", stiffness: 400, damping: 30 }}
-          />
-        </div>
-      </div>
-
       {/* Letter display */}
       <div className="text-center">
         <AnimatePresence mode="wait">
@@ -224,131 +365,68 @@ export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
 
       {/* Drawing canvas */}
       <div
-        className="drawing-canvas w-full aspect-square rounded-xl border border-border bg-paper relative overflow-hidden"
-        style={{ boxShadow: "var(--shadow-md)", maxWidth: "320px" }}
+        className="drawing-canvas w-full aspect-[5/6] rounded-xl border border-border bg-paper relative overflow-hidden"
+        style={{ boxShadow: "var(--shadow-md)", maxWidth: "300px", containerType: "size" }}
       >
         <canvas
           ref={canvasRef}
           className="w-full h-full"
-          onMouseDown={startDraw}
-          onMouseMove={draw}
-          onMouseUp={endDraw}
-          onMouseLeave={endDraw}
-          onTouchStart={startDraw}
-          onTouchMove={draw}
-          onTouchEnd={endDraw}
+          style={{ touchAction: "none" }}
+          onPointerDown={startDraw}
+          onPointerMove={draw}
+          onPointerUp={endDraw}
+          onPointerCancel={endDraw}
+          onPointerLeave={endDraw}
         />
-        {/* Guide letter (faint) */}
+        {/* Typographic guide lines (always visible) */}
+        <div
+          className="absolute left-0 right-0 border-t border-dashed pointer-events-none"
+          style={{ top: `${GUIDE_LINES.xHeight * 100}%`, borderColor: 'rgba(0,0,0,0.08)' }}
+        />
+        <div
+          className="absolute left-0 right-0 border-t border-dashed pointer-events-none"
+          style={{ top: `${GUIDE_LINES.baseline * 100}%`, borderColor: 'rgba(0,0,0,0.12)' }}
+        />
+        {/* Guide letter (faint) — hides on first stroke */}
         {!hasContent && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <span className="text-8xl text-ink/[0.04] font-medium select-none">
-              {currentLetter}
-            </span>
-          </div>
+          <span
+            className="absolute pointer-events-none select-none font-medium text-ink/[0.04]"
+            style={{
+              fontSize: GHOST_FONT_SIZE,
+              lineHeight: 1,
+              left: '50%',
+              top: `${GUIDE_LINES.baseline * 100}%`,
+              transform: 'translate(-50%, -86%)',
+            }}
+          >
+            {currentLetter}
+          </span>
         )}
       </div>
 
-      {/* Brush settings toggle + panel */}
-      <div className="w-full flex flex-col items-center gap-3" style={{ maxWidth: "320px" }}>
-        <button
-          onClick={() => setShowSettings(!showSettings)}
-          className="text-[10px] uppercase tracking-[0.2em] text-fg/30 hover:text-fg/60 transition-colors flex items-center gap-1.5"
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="3" />
-            <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
-          </svg>
-          brush{showSettings ? "" : " settings"}
-        </button>
-
-        <AnimatePresence>
-          {showSettings && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ type: "spring", stiffness: 500, damping: 35 }}
-              className="w-full overflow-hidden"
-            >
-              <div className="flex flex-col gap-4 py-3 px-4 rounded-xl border border-border bg-surface/60"
-                style={{ boxShadow: "var(--shadow-sm)" }}
-              >
-                {/* Thickness */}
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] uppercase tracking-[0.2em] text-fg/40">
-                    thickness
-                  </span>
-                  <div className="flex items-center gap-2">
-                    {THICKNESS_OPTIONS.map((opt) => (
-                      <button
-                        key={opt.value}
-                        onClick={() => setThickness(opt.value)}
-                        className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${
-                          thickness === opt.value
-                            ? "bg-fg text-bg"
-                            : "bg-transparent text-fg/35 hover:text-fg/60"
-                        }`}
-                        title={opt.label}
-                      >
-                        <span
-                          className="block rounded-full bg-current"
-                          style={{
-                            width: `${Math.max(opt.value * 1.2, 3)}px`,
-                            height: `${Math.max(opt.value * 1.2, 3)}px`,
-                          }}
-                        />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Opacity */}
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] uppercase tracking-[0.2em] text-fg/40">
-                    opacity
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    {OPACITY_OPTIONS.map((opt) => (
-                      <button
-                        key={opt.value}
-                        onClick={() => setOpacity(opt.value)}
-                        className={`px-2.5 py-1 rounded-full text-[10px] tracking-wide transition-all ${
-                          opacity === opt.value
-                            ? "bg-fg text-bg"
-                            : "text-fg/35 hover:text-fg/60"
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Tip style */}
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] uppercase tracking-[0.2em] text-fg/40">
-                    tip
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    {TIP_OPTIONS.map((opt) => (
-                      <button
-                        key={opt.value}
-                        onClick={() => setTip(opt.value)}
-                        className={`px-2.5 py-1 rounded-full text-[10px] tracking-wide transition-all ${
-                          tip === opt.value
-                            ? "bg-fg text-bg"
-                            : "text-fg/35 hover:text-fg/60"
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+      {/* Thickness slider (always visible) */}
+      <div className="flex items-center gap-3 w-full" style={{ maxWidth: "300px" }}>
+        <span
+          className="block rounded-full bg-fg/40 shrink-0"
+          style={{ width: "3px", height: "3px" }}
+        />
+        <input
+          type="range"
+          min={1}
+          max={40}
+          step={1}
+          value={thickness}
+          onChange={(e) => setThickness(Number(e.target.value))}
+          className="w-full h-[2px] appearance-none bg-border rounded-full outline-none
+            [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4
+            [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-fg [&::-webkit-slider-thumb]:cursor-pointer
+            [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full
+            [&::-moz-range-thumb]:bg-fg [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer"
+        />
+        <span
+          className="block rounded-full bg-fg/40 shrink-0"
+          style={{ width: "12px", height: "12px" }}
+        />
       </div>
 
       {/* Controls */}
@@ -366,8 +444,17 @@ export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
           className="px-5 py-2.5 rounded-full bg-fg text-bg text-xs tracking-wide hover:bg-fg/85 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
           style={{ boxShadow: "var(--shadow-sm)" }}
         >
-          {currentIndex < ALL_LETTERS.length - 1 ? "next" : "done"}
+          next
         </button>
+        {canFinish && (
+          <button
+            onClick={finishEarly}
+            className="px-5 py-2.5 rounded-full border border-fg/20 text-xs tracking-wide text-fg/50 hover:border-fg/40 hover:text-fg/70 transition-colors"
+            style={{ boxShadow: "var(--shadow-sm)" }}
+          >
+            finish
+          </button>
+        )}
       </div>
 
       {/* Letter carousel (mini) */}
@@ -384,7 +471,7 @@ export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
             }`}
             whileHover={{ scale: 1.15 }}
             whileTap={{ scale: 0.95 }}
-            onClick={() => setCurrentIndex(i)}
+            onClick={() => goToLetter(i)}
           >
             {letter}
           </motion.div>

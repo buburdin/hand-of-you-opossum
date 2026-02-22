@@ -5,12 +5,25 @@
 
 import opentype from "opentype.js";
 import type { VectorizedGlyph } from "./vectorize";
+import { GUIDE_LINES } from "../pangrams";
 
 // Font metrics
 const UNITS_PER_EM = 1000;
 const ASCENDER = 800;
 const DESCENDER = -200;
 const TARGET_HEIGHT = ASCENDER - DESCENDER; // 1000
+
+/**
+ * Punctuation metrics: scale relative to TARGET_HEIGHT and vertical offset
+ * from the descender line (in font units).
+ * yOffset positions the bottom of the glyph's bounding box.
+ */
+const PUNCTUATION_METRICS: Record<string, { scale: number; yOffset: number }> = {
+  ".":  { scale: 0.12, yOffset: 0 },     // baseline
+  ",":  { scale: 0.20, yOffset: -80 },    // slightly below baseline
+  "-":  { scale: 0.10, yOffset: 250 },    // mid x-height
+  "'":  { scale: 0.18, yOffset: 520 },    // near cap height
+};
 
 // ─── SVG path parsing ────────────────────────────────────────────────────────
 
@@ -216,11 +229,16 @@ function pathBoundingBox(cmds: PathCommand[]): {
  * - Translate so bounding box starts at the descender
  * - Scale to fit within font units (1000 UPM)
  * - Add left side bearing offset
+ *
+ * When `referenceHeight` is provided (draw mode), all glyphs use the same
+ * scale factor so stroke thickness is consistent across letters.
  */
 function transformToFontCoords(
   cmds: PathCommand[],
   sourceWidth: number,
   sourceHeight: number,
+  punctuation?: { scale: number; yOffset: number },
+  referenceHeight?: number,
 ): { commands: PathCommand[]; advanceWidth: number; lsb: number } {
   const bbox = pathBoundingBox(cmds);
   const bw = bbox.maxX - bbox.minX;
@@ -230,18 +248,79 @@ function transformToFontCoords(
     return { commands: [], advanceWidth: Math.round(UNITS_PER_EM * 0.5), lsb: 0 };
   }
 
-  const scale = TARGET_HEIGHT / Math.max(bh, 1);
+  // Uniform scaling mode: referenceHeight provided and NOT punctuation
+  const useUniformScale = referenceHeight != null && !punctuation;
+
+  // For punctuation, scale to a fraction of the em and position vertically
+  // For uniform mode, scale by referenceHeight so all glyphs get identical scale
+  const targetH = punctuation ? TARGET_HEIGHT * punctuation.scale : TARGET_HEIGHT;
+  const scale = useUniformScale
+    ? TARGET_HEIGHT / referenceHeight
+    : targetH / Math.max(bh, 1);
   const scaledWidth = Math.round(bw * scale);
   const bearing = Math.round(scaledWidth * 0.12);
   const advanceWidth = scaledWidth + bearing * 2;
 
   // No Y-flip: potrace raw coords are already Y-UP.
   // Just scale to font units and position within em square.
-  const transform = (x: number, y: number): [number, number] => {
-    const fx = (x - bbox.minX) * scale + bearing;
-    const fy = (y - bbox.minY) * scale + DESCENDER;
-    return [Math.round(fx), Math.round(fy)];
-  };
+  let transform: (x: number, y: number) => [number, number];
+
+  if (useUniformScale) {
+    // Guide lines don't span the full canvas — account for padding
+    const descYFrac = 1 - GUIDE_LINES.descender; // fraction from bottom (potrace Y-up)
+    const ascYFrac  = 1 - GUIDE_LINES.ascender;
+    const effectiveHeight = (ascYFrac - descYFrac) * referenceHeight;
+    const potraceDescY = descYFrac * referenceHeight;
+    const uniformScale = TARGET_HEIGHT / effectiveHeight;
+    const scaledWidth = Math.round(bw * uniformScale);
+    const uniformBearing = Math.round(scaledWidth * 0.12);
+
+    transform = (x: number, y: number): [number, number] => {
+      const fx = (x - bbox.minX) * uniformScale + uniformBearing;
+      const fy = (y - potraceDescY) * uniformScale + DESCENDER;
+      return [Math.round(fx), Math.round(fy)];
+    };
+
+    // Return early with correct advanceWidth using the uniform scale
+    const uniformAdvanceWidth = scaledWidth + uniformBearing * 2;
+
+    const transformed: PathCommand[] = [];
+    for (const cmd of cmds) {
+      switch (cmd.type) {
+        case "M":
+        case "L": {
+          const [x, y] = transform(cmd.x, cmd.y);
+          transformed.push({ type: cmd.type, x, y });
+          break;
+        }
+        case "C": {
+          const [x, y] = transform(cmd.x, cmd.y);
+          const [x1, y1] = transform(cmd.x1, cmd.y1);
+          const [x2, y2] = transform(cmd.x2, cmd.y2);
+          transformed.push({ type: "C", x, y, x1, y1, x2, y2 });
+          break;
+        }
+        case "Q": {
+          const [x, y] = transform(cmd.x, cmd.y);
+          const [x1, y1] = transform(cmd.x1, cmd.y1);
+          transformed.push({ type: "Q", x, y, x1, y1 });
+          break;
+        }
+        case "Z":
+          transformed.push({ type: "Z" });
+          break;
+      }
+    }
+
+    return { commands: transformed, advanceWidth: uniformAdvanceWidth, lsb: uniformBearing };
+  } else {
+    const yBase = punctuation ? DESCENDER + punctuation.yOffset : DESCENDER;
+    transform = (x: number, y: number): [number, number] => {
+      const fx = (x - bbox.minX) * scale + bearing;
+      const fy = (y - bbox.minY) * scale + yBase;
+      return [Math.round(fx), Math.round(fy)];
+    };
+  }
 
   const transformed: PathCommand[] = [];
   for (const cmd of cmds) {
@@ -319,11 +398,14 @@ export interface FontResult {
  *
  * @param glyphs Map of character → VectorizedGlyph (SVG path data from potrace)
  * @param familyName Font family name
+ * @param referenceHeight When provided (draw mode), all non-punctuation glyphs
+ *   use the same scale factor for consistent stroke thickness
  * @returns Font ArrayBuffer and metadata
  */
 export function generateFont(
   glyphs: Record<string, VectorizedGlyph>,
   familyName = "MyHandwriting",
+  referenceHeight?: number,
 ): FontResult {
   // .notdef glyph (required)
   const notdefPath = new opentype.Path();
@@ -374,6 +456,8 @@ export function generateFont(
       allCommands,
       glyph.sourceWidth,
       glyph.sourceHeight,
+      PUNCTUATION_METRICS[char],
+      referenceHeight,
     );
 
     if (commands.length === 0) continue;

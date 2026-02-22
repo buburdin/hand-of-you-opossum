@@ -24,6 +24,7 @@ interface FontExportProps {
   charsFound?: string[];
   onExportImage?: () => void;
   onShare?: () => void;
+  onEditLetters?: () => void;
 }
 
 export default function FontExport({
@@ -31,6 +32,7 @@ export default function FontExport({
   charsFound = [],
   onExportImage,
   onShare,
+  onEditLetters,
 }: FontExportProps) {
   const handleDownloadTTF = () => {
     if (ttfData) {
@@ -54,6 +56,15 @@ export default function FontExport({
           share
         </button>
         <div className="flex items-center gap-3">
+          {onEditLetters && (
+            <button
+              onClick={onEditLetters}
+              className="px-5 py-3 rounded-full border border-border text-xs tracking-wide hover:border-fg/30 transition-colors"
+              style={{ boxShadow: "var(--shadow-sm)" }}
+            >
+              edit letters
+            </button>
+          )}
           <button
             onClick={onExportImage}
             className="px-5 py-3 rounded-full border border-border text-xs tracking-wide hover:border-fg/30 transition-colors"
@@ -77,6 +88,7 @@ export default function FontExport({
           {charsFound.length} letters extracted: {[...charsFound].sort().join(" ")}
         </p>
       )}
+
     </motion.div>
   );
 }
