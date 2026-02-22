@@ -76,7 +76,7 @@ export default function DrawCanvas({ onComplete, initialGlyphs, onGlyphsChange }
   currentIndexRef.current = currentIndex;
 
   // Brush settings
-  const [thickness, setThickness] = useState(18);
+  const [thickness, setThickness] = useState(24);
   const [opacity, setOpacity] = useState(1);
   const [tip, setTip] = useState<CanvasLineCap>("round");
   const [showSettings, setShowSettings] = useState(false);
