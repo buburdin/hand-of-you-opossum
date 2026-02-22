@@ -25,5 +25,5 @@ export function getUniqueChars(pangram: string): string[] {
   return chars;
 }
 
-// All 26 letters for draw mode
-export const ALL_LETTERS = "abcdefghijklmnopqrstuvwxyz".split("");
+// All 26 letters + punctuation for draw mode
+export const ALL_LETTERS = [..."abcdefghijklmnopqrstuvwxyz", ",", ".", "-", "'"];

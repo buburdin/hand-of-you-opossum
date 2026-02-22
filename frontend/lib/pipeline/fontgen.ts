@@ -12,6 +12,18 @@ const ASCENDER = 800;
 const DESCENDER = -200;
 const TARGET_HEIGHT = ASCENDER - DESCENDER; // 1000
 
+/**
+ * Punctuation metrics: scale relative to TARGET_HEIGHT and vertical offset
+ * from the descender line (in font units).
+ * yOffset positions the bottom of the glyph's bounding box.
+ */
+const PUNCTUATION_METRICS: Record<string, { scale: number; yOffset: number }> = {
+  ".":  { scale: 0.12, yOffset: 0 },     // baseline
+  ",":  { scale: 0.20, yOffset: -80 },    // slightly below baseline
+  "-":  { scale: 0.10, yOffset: 250 },    // mid x-height
+  "'":  { scale: 0.18, yOffset: 520 },    // near cap height
+};
+
 // ─── SVG path parsing ────────────────────────────────────────────────────────
 
 type PathCommand =
@@ -221,6 +233,7 @@ function transformToFontCoords(
   cmds: PathCommand[],
   sourceWidth: number,
   sourceHeight: number,
+  punctuation?: { scale: number; yOffset: number },
 ): { commands: PathCommand[]; advanceWidth: number; lsb: number } {
   const bbox = pathBoundingBox(cmds);
   const bw = bbox.maxX - bbox.minX;
@@ -230,16 +243,19 @@ function transformToFontCoords(
     return { commands: [], advanceWidth: Math.round(UNITS_PER_EM * 0.5), lsb: 0 };
   }
 
-  const scale = TARGET_HEIGHT / Math.max(bh, 1);
+  // For punctuation, scale to a fraction of the em and position vertically
+  const targetH = punctuation ? TARGET_HEIGHT * punctuation.scale : TARGET_HEIGHT;
+  const scale = targetH / Math.max(bh, 1);
   const scaledWidth = Math.round(bw * scale);
   const bearing = Math.round(scaledWidth * 0.12);
   const advanceWidth = scaledWidth + bearing * 2;
+  const yBase = punctuation ? DESCENDER + punctuation.yOffset : DESCENDER;
 
   // No Y-flip: potrace raw coords are already Y-UP.
   // Just scale to font units and position within em square.
   const transform = (x: number, y: number): [number, number] => {
     const fx = (x - bbox.minX) * scale + bearing;
-    const fy = (y - bbox.minY) * scale + DESCENDER;
+    const fy = (y - bbox.minY) * scale + yBase;
     return [Math.round(fx), Math.round(fy)];
   };
 
@@ -374,6 +390,7 @@ export function generateFont(
       allCommands,
       glyph.sourceWidth,
       glyph.sourceHeight,
+      PUNCTUATION_METRICS[char],
     );
 
     if (commands.length === 0) continue;
