@@ -19,18 +19,10 @@ export default function ModeSelector({ mode, onModeChange }: ModeSelectorProps) 
         layout
         transition={{ type: "spring", stiffness: 500, damping: 35 }}
         style={{
-          left: mode === "snap" ? 2 : "50%",
-          right: mode === "draw" ? 2 : "50%",
+          left: mode === "draw" ? 2 : "50%",
+          right: mode === "snap" ? 2 : "50%",
         }}
       />
-      <button
-        onClick={() => onModeChange("snap")}
-        className={`relative z-10 px-5 py-2 rounded-full transition-colors duration-150 ${
-          mode === "snap" ? "text-bg" : "text-fg/50"
-        }`}
-      >
-        snap a pangram
-      </button>
       <button
         onClick={() => onModeChange("draw")}
         className={`relative z-10 px-5 py-2 rounded-full transition-colors duration-150 ${
@@ -38,6 +30,14 @@ export default function ModeSelector({ mode, onModeChange }: ModeSelectorProps) 
         }`}
       >
         draw letters
+      </button>
+      <button
+        onClick={() => onModeChange("snap")}
+        className={`relative z-10 px-5 py-2 rounded-full transition-colors duration-150 ${
+          mode === "snap" ? "text-bg" : "text-fg/50"
+        }`}
+      >
+        snap a pangram
       </button>
     </div>
   );
