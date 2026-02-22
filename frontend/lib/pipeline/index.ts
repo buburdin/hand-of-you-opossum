@@ -11,7 +11,6 @@
 
 import { preprocessPhoto, preprocessGlyph } from "./preprocess";
 import {
-  extractSingleGlyph,
   type CharBitmap,
 } from "./segment";
 import { initPotrace, vectorizeGlyph, type VectorizedGlyph } from "./vectorize";
@@ -328,28 +327,28 @@ export async function processDrawnGlyphsLocally(
       // 1. Preprocess
       const { binary, width, height } = await preprocessGlyph(blob);
 
-      // 2. Extract & center
-      const extracted = extractSingleGlyph(binary, width, height);
-
-      // 3. Vectorize
-      const vectorized = await vectorizeGlyph(
-        extracted.binary,
-        extracted.width,
-        extracted.height,
-      );
+      // 2. Vectorize full canvas (no crop — preserves vertical position for uniform scaling)
+      const vectorized = await vectorizeGlyph(binary, width, height);
 
       return vectorized.paths.length > 0 ? [char.toLowerCase(), vectorized] as const : null;
     })
   );
   const glyphs: Record<string, VectorizedGlyph> = {};
+  let referenceHeight: number | undefined;
   for (const r of drawnResults) {
-    if (r) glyphs[r[0]] = r[1];
+    if (r) {
+      glyphs[r[0]] = r[1];
+      // All canvases are the same size — capture potraceHeight from first glyph
+      if (referenceHeight === undefined && r[1].potraceHeight) {
+        referenceHeight = r[1].potraceHeight;
+      }
+    }
   }
 
   if (Object.keys(glyphs).length === 0) {
     throw new Error("No valid glyphs could be processed from the drawn characters.");
   }
 
-  // 4. Generate font
-  return generateFont(glyphs);
+  // 4. Generate font (pass referenceHeight for uniform scaling in draw mode)
+  return generateFont(glyphs, "MyHandwriting", referenceHeight);
 }

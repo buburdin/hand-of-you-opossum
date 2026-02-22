@@ -228,12 +228,16 @@ function pathBoundingBox(cmds: PathCommand[]): {
  * - Translate so bounding box starts at the descender
  * - Scale to fit within font units (1000 UPM)
  * - Add left side bearing offset
+ *
+ * When `referenceHeight` is provided (draw mode), all glyphs use the same
+ * scale factor so stroke thickness is consistent across letters.
  */
 function transformToFontCoords(
   cmds: PathCommand[],
   sourceWidth: number,
   sourceHeight: number,
   punctuation?: { scale: number; yOffset: number },
+  referenceHeight?: number,
 ): { commands: PathCommand[]; advanceWidth: number; lsb: number } {
   const bbox = pathBoundingBox(cmds);
   const bw = bbox.maxX - bbox.minX;
@@ -243,21 +247,39 @@ function transformToFontCoords(
     return { commands: [], advanceWidth: Math.round(UNITS_PER_EM * 0.5), lsb: 0 };
   }
 
+  // Uniform scaling mode: referenceHeight provided and NOT punctuation
+  const useUniformScale = referenceHeight != null && !punctuation;
+
   // For punctuation, scale to a fraction of the em and position vertically
+  // For uniform mode, scale by referenceHeight so all glyphs get identical scale
   const targetH = punctuation ? TARGET_HEIGHT * punctuation.scale : TARGET_HEIGHT;
-  const scale = targetH / Math.max(bh, 1);
+  const scale = useUniformScale
+    ? TARGET_HEIGHT / referenceHeight
+    : targetH / Math.max(bh, 1);
   const scaledWidth = Math.round(bw * scale);
   const bearing = Math.round(scaledWidth * 0.12);
   const advanceWidth = scaledWidth + bearing * 2;
-  const yBase = punctuation ? DESCENDER + punctuation.yOffset : DESCENDER;
 
   // No Y-flip: potrace raw coords are already Y-UP.
   // Just scale to font units and position within em square.
-  const transform = (x: number, y: number): [number, number] => {
-    const fx = (x - bbox.minX) * scale + bearing;
-    const fy = (y - bbox.minY) * scale + yBase;
-    return [Math.round(fx), Math.round(fy)];
-  };
+  let transform: (x: number, y: number) => [number, number];
+
+  if (useUniformScale) {
+    // Uniform mode: preserve absolute Y position from potrace.
+    // potrace y=0 → descender, y=referenceHeight → ascender
+    transform = (x: number, y: number): [number, number] => {
+      const fx = (x - bbox.minX) * scale + bearing;
+      const fy = y * scale + DESCENDER;
+      return [Math.round(fx), Math.round(fy)];
+    };
+  } else {
+    const yBase = punctuation ? DESCENDER + punctuation.yOffset : DESCENDER;
+    transform = (x: number, y: number): [number, number] => {
+      const fx = (x - bbox.minX) * scale + bearing;
+      const fy = (y - bbox.minY) * scale + yBase;
+      return [Math.round(fx), Math.round(fy)];
+    };
+  }
 
   const transformed: PathCommand[] = [];
   for (const cmd of cmds) {
@@ -335,11 +357,14 @@ export interface FontResult {
  *
  * @param glyphs Map of character → VectorizedGlyph (SVG path data from potrace)
  * @param familyName Font family name
+ * @param referenceHeight When provided (draw mode), all non-punctuation glyphs
+ *   use the same scale factor for consistent stroke thickness
  * @returns Font ArrayBuffer and metadata
  */
 export function generateFont(
   glyphs: Record<string, VectorizedGlyph>,
   familyName = "MyHandwriting",
+  referenceHeight?: number,
 ): FontResult {
   // .notdef glyph (required)
   const notdefPath = new opentype.Path();
@@ -391,6 +416,7 @@ export function generateFont(
       glyph.sourceWidth,
       glyph.sourceHeight,
       PUNCTUATION_METRICS[char],
+      referenceHeight,
     );
 
     if (commands.length === 0) continue;
