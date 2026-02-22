@@ -3,7 +3,7 @@
 import { useRef, useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getStroke } from "perfect-freehand";
-import { ALL_LETTERS, LETTER_CATEGORY, GUIDE_LINES, type LetterCategory } from "@/lib/pangrams";
+import { ALL_LETTERS, GUIDE_LINES } from "@/lib/pangrams";
 
 /** Turns perfect-freehand outline points into an SVG path string for Path2D/fill. */
 function getSvgPathFromStroke(points: number[][], closed = true): string {
@@ -28,22 +28,10 @@ interface DrawCanvasProps {
   onGlyphsChange?: (glyphs: Record<string, Blob>) => void;
 }
 
-/** Guide style overrides for punctuation so they render at natural proportions. */
-const PUNCTUATION_GUIDE_STYLE: Record<string, { fontSize: string; top?: string; bottom?: string }> = {
-  ",":  { fontSize: "4rem",  bottom: "15%" },
-  ".":  { fontSize: "4rem",  bottom: "15%" },
-  "-":  { fontSize: "5rem" },
-  "'":  { fontSize: "4rem",  top: "15%" },
-};
-
-/** Ghost letter positioning per typographic category. */
-const CATEGORY_GUIDE_STYLE: Record<LetterCategory, { fontSize: string; top: string; bottom: string }> = {
-  'x-height':    { fontSize: '7rem',  top: '30%', bottom: '20%' },
-  'ascender':    { fontSize: '9rem',  top: '0%',  bottom: '20%' },
-  'descender':   { fontSize: '8rem',  top: '30%', bottom: '0%' },
-  'number':      { fontSize: '8rem',  top: '10%', bottom: '20%' },
-  'punctuation': { fontSize: '10rem', top: '0%',  bottom: '0%' },
-};
+/** Ghost letter font-size in container-query-height units so it scales with the canvas.
+ *  Calibrated for JetBrains Mono (ascender 1020, descender -300, x-height 536, UPM 1000)
+ *  so that lowercase x-height ≈ the x-height guide line (30%) and caps fill to near the top. */
+const GHOST_FONT_SIZE = '88cqh';
 
 const THICKNESS_OPTIONS = [
   { label: "S", value: 2 },
@@ -88,7 +76,7 @@ export default function DrawCanvas({ onComplete, initialGlyphs, onGlyphsChange }
   currentIndexRef.current = currentIndex;
 
   // Brush settings
-  const [thickness, setThickness] = useState(12);
+  const [thickness, setThickness] = useState(18);
   const [opacity, setOpacity] = useState(1);
   const [tip, setTip] = useState<CanvasLineCap>("round");
   const [showSettings, setShowSettings] = useState(false);
@@ -376,7 +364,7 @@ export default function DrawCanvas({ onComplete, initialGlyphs, onGlyphsChange }
       {/* Drawing canvas */}
       <div
         className="drawing-canvas w-full aspect-square rounded-xl border border-border bg-paper relative overflow-hidden"
-        style={{ boxShadow: "var(--shadow-md)", maxWidth: "380px" }}
+        style={{ boxShadow: "var(--shadow-md)", maxWidth: "300px", containerType: "size" }}
       >
         <canvas
           ref={canvasRef}
@@ -398,33 +386,24 @@ export default function DrawCanvas({ onComplete, initialGlyphs, onGlyphsChange }
           style={{ top: `${GUIDE_LINES.baseline * 100}%`, borderColor: 'rgba(0,0,0,0.12)' }}
         />
         {/* Guide letter (faint) — hides on first stroke */}
-        {!hasContent && (() => {
-          const punctStyle = PUNCTUATION_GUIDE_STYLE[currentLetter];
-          const category = LETTER_CATEGORY[currentLetter] ?? 'x-height';
-          const catStyle = CATEGORY_GUIDE_STYLE[category];
-          return (
-            <div
-              className="absolute left-0 right-0 flex items-center justify-center pointer-events-none"
-              style={{
-                top: punctStyle?.top ?? catStyle.top,
-                bottom: punctStyle?.bottom ?? catStyle.bottom,
-              }}
-            >
-              <span
-                className="text-ink/[0.04] font-medium select-none leading-none"
-                style={{
-                  fontSize: punctStyle?.fontSize ?? catStyle.fontSize,
-                }}
-              >
-                {currentLetter}
-              </span>
-            </div>
-          );
-        })()}
+        {!hasContent && (
+          <span
+            className="absolute pointer-events-none select-none font-medium text-ink/[0.04]"
+            style={{
+              fontSize: GHOST_FONT_SIZE,
+              lineHeight: 1,
+              left: '50%',
+              top: `${GUIDE_LINES.baseline * 100}%`,
+              transform: 'translate(-50%, -86%)',
+            }}
+          >
+            {currentLetter}
+          </span>
+        )}
       </div>
 
       {/* Thickness slider (always visible) */}
-      <div className="flex items-center gap-3 w-full" style={{ maxWidth: "380px" }}>
+      <div className="flex items-center gap-3 w-full" style={{ maxWidth: "300px" }}>
         <span
           className="block rounded-full bg-fg/40 shrink-0"
           style={{ width: "3px", height: "3px" }}

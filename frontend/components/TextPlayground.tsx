@@ -100,7 +100,7 @@ const TextPlayground = forwardRef<TextPlaygroundHandle, TextPlaygroundProps>(
           style={{
             fontFamily: fontLoaded ? `"${fontFamily}", sans-serif` : "inherit",
             fontSize: `${fontSize}px`,
-            lineHeight: 1.15,
+            lineHeight: 1.0,
             wordSpacing: "0.4em",
           }}
         />
