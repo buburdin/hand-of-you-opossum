@@ -24,6 +24,8 @@ function getSvgPathFromStroke(points: number[][], closed = true): string {
 
 interface DrawCanvasProps {
   onComplete: (glyphImages: Record<string, Blob>) => void;
+  initialGlyphs?: Record<string, Blob>;
+  onGlyphsChange?: (glyphs: Record<string, Blob>) => void;
 }
 
 /** Guide style overrides for punctuation so they render at natural proportions. */
@@ -57,7 +59,7 @@ interface CompletedStroke {
   fillStyle: string;
 }
 
-export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
+export default function DrawCanvas({ onComplete, initialGlyphs, onGlyphsChange }: DrawCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
   const currentStrokePointsRef = useRef<[number, number, number][]>([]);
@@ -65,7 +67,7 @@ export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
   const completedStrokesRef = useRef<CompletedStroke[]>([]);
   const backgroundImageRef = useRef<HTMLImageElement | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [drawnGlyphs, setDrawnGlyphs] = useState<Record<string, Blob>>({});
+  const [drawnGlyphs, setDrawnGlyphs] = useState<Record<string, Blob>>(initialGlyphs ?? {});
   const [hasContent, setHasContent] = useState(false);
 
   // Refs to avoid stale closures in async save callbacks
@@ -77,7 +79,7 @@ export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
   currentIndexRef.current = currentIndex;
 
   // Brush settings
-  const [thickness, setThickness] = useState(8);
+  const [thickness, setThickness] = useState(12);
   const [opacity, setOpacity] = useState(1);
   const [tip, setTip] = useState<CanvasLineCap>("round");
   const [showSettings, setShowSettings] = useState(false);
@@ -280,9 +282,10 @@ export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
     const newGlyphs = { ...drawnGlyphsRef.current, [letter]: blob };
     drawnGlyphsRef.current = newGlyphs;
     setDrawnGlyphs(newGlyphs);
+    onGlyphsChange?.(newGlyphs);
     setHasContent(false);
     return newGlyphs;
-  }, []);
+  }, [onGlyphsChange]);
 
   const saveAndNext = useCallback(() => {
     const newGlyphs = saveCurrent();
@@ -321,6 +324,14 @@ export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
       onComplete(drawnGlyphs);
     }
   };
+
+  const finishEarly = useCallback(() => {
+    // Save current letter if it has content, then complete
+    const glyphs = saveCurrent() ?? drawnGlyphsRef.current;
+    onComplete(glyphs);
+  }, [saveCurrent, onComplete]);
+
+  const canFinish = Object.keys(drawnGlyphs).length > 0 || hasContent;
 
   return (
     <motion.div
@@ -450,6 +461,15 @@ export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
         >
           {currentIndex < ALL_LETTERS.length - 1 ? "next" : "done"}
         </button>
+        {currentIndex < ALL_LETTERS.length - 1 && canFinish && (
+          <button
+            onClick={finishEarly}
+            className="px-5 py-2.5 rounded-full border border-fg/20 text-xs tracking-wide text-fg/50 hover:border-fg/40 hover:text-fg/70 transition-colors"
+            style={{ boxShadow: "var(--shadow-sm)" }}
+          >
+            done
+          </button>
+        )}
       </div>
 
       {/* Letter carousel (mini) */}

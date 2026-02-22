@@ -53,7 +53,7 @@ function pickRandom<T>(arr: T[], count: number): T[] {
 const TextPlayground = forwardRef<TextPlaygroundHandle, TextPlaygroundProps>(
   function TextPlayground({ fontLoaded }, ref) {
   const [text, setText] = useState("this is my handwriting and i'm not sorry");
-  const [fontSize, setFontSize] = useState(36);
+  const [fontSize, setFontSize] = useState(64);
   const [noteColor, setNoteColor] = useState<NoteColor>(NOTE_COLORS[0]);
   const textDisplayRef = useRef<HTMLDivElement>(null);
   const fontFamily = getFontFamilyName();
@@ -100,7 +100,7 @@ const TextPlayground = forwardRef<TextPlaygroundHandle, TextPlaygroundProps>(
           style={{
             fontFamily: fontLoaded ? `"${fontFamily}", sans-serif` : "inherit",
             fontSize: `${fontSize}px`,
-            lineHeight: 1.6,
+            lineHeight: 1.15,
             wordSpacing: "0.4em",
           }}
         />
@@ -138,7 +138,7 @@ const TextPlayground = forwardRef<TextPlaygroundHandle, TextPlaygroundProps>(
         <input
           type="range"
           min={16}
-          max={72}
+          max={256}
           value={fontSize}
           onChange={(e) => setFontSize(parseInt(e.target.value))}
           className="flex-1 accent-fg/60 h-[2px]"

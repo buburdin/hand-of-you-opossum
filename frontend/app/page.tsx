@@ -31,6 +31,7 @@ export default function Home() {
   const [fontLoaded, setFontLoaded] = useState(false);
   const [charsFound, setCharsFound] = useState<string[]>([]);
   const [debugData, setDebugData] = useState<PipelineDebugData | null>(null);
+  const [drawnGlyphs, setDrawnGlyphs] = useState<Record<string, Blob>>({});
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -114,8 +115,14 @@ export default function Home() {
     setFontResult(null);
     setFontLoaded(false);
     setCharsFound([]);
+    setDrawnGlyphs({});
     setDebugData(null);
     setError(null);
+  };
+
+  const handleEditLetters = () => {
+    setStep("input");
+    setMode("draw");
   };
 
   return (
@@ -218,6 +225,8 @@ export default function Home() {
                   <DrawCanvas
                     key="draw"
                     onComplete={handleDrawComplete}
+                    initialGlyphs={drawnGlyphs}
+                    onGlyphsChange={setDrawnGlyphs}
                   />
                 )}
               </AnimatePresence>
@@ -246,6 +255,7 @@ export default function Home() {
               <FontExport
                 ttfData={fontResult?.ttf ?? null}
                 charsFound={charsFound}
+                onEditLetters={handleEditLetters}
                 onExportImage={() => {
                   const el = playgroundRef.current?.getDisplayElement();
                   if (el) exportElementAsImage(el).catch(() => {
