@@ -2,7 +2,25 @@
 
 import { useRef, useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { getStroke } from "perfect-freehand";
 import { ALL_LETTERS } from "@/lib/pangrams";
+
+/** Turns perfect-freehand outline points into an SVG path string for Path2D/fill. */
+function getSvgPathFromStroke(points: number[][], closed = true): string {
+  const len = points.length;
+  if (len < 4) return "";
+  const avg = (a: number, b: number) => (a + b) / 2;
+  let a = points[0];
+  let b = points[1];
+  const c = points[2];
+  let result = `M${a[0].toFixed(2)},${a[1].toFixed(2)} Q${b[0].toFixed(2)},${b[1].toFixed(2)} ${avg(b[0], c[0]).toFixed(2)},${avg(b[1], c[1]).toFixed(2)} T`;
+  for (let i = 2, max = len - 1; i < max; i++) {
+    a = points[i];
+    b = points[i + 1];
+    result += `${avg(a[0], b[0]).toFixed(2)},${avg(a[1], b[1]).toFixed(2)} `;
+  }
+  return result + (closed ? "Z" : "");
+}
 
 interface DrawCanvasProps {
   onComplete: (glyphImages: Record<string, Blob>) => void;
@@ -26,12 +44,10 @@ const TIP_OPTIONS = [
   { label: "flat", value: "square" as CanvasLineCap },
 ] as const;
 
-const MIN_POINT_DISTANCE_SQ = 0.25;
-
 export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
-  const lastPointRef = useRef<{ x: number; y: number; midX?: number; midY?: number } | null>(null);
+  const currentStrokePointsRef = useRef<[number, number, number][]>([]);
   const isDrawingRef = useRef(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [drawnGlyphs, setDrawnGlyphs] = useState<Record<string, Blob>>({});
@@ -63,7 +79,7 @@ export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
   const clearCanvas = useCallback(() => {
     clearCanvasSurface();
     setHasContent(false);
-    lastPointRef.current = null;
+    currentStrokePointsRef.current = [];
     isDrawingRef.current = false;
   }, [clearCanvasSurface]);
 
@@ -83,7 +99,7 @@ export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
     ctxRef.current = ctx;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     clearCanvasSurface();
-    lastPointRef.current = null;
+    currentStrokePointsRef.current = [];
     isDrawingRef.current = false;
   }, [clearCanvasSurface, currentIndex]);
 
@@ -97,21 +113,38 @@ export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
     };
   };
 
+  const renderCurrentStroke = useCallback(
+    (points: [number, number, number][], last: boolean) => {
+      const ctx = ctxRef.current;
+      if (!ctx || points.length < 2) return;
+      try {
+        const outline = getStroke(points, {
+          size: thickness,
+          thinning: 0.5,
+          smoothing: 0.5,
+          streamline: 0.5,
+          simulatePressure: false,
+          last,
+        });
+        if (outline.length < 4) return;
+        const pathData = getSvgPathFromStroke(outline);
+        const path = new Path2D(pathData);
+        ctx.fillStyle = `rgba(26, 26, 26, ${opacity})`;
+        ctx.fill(path);
+      } catch (err) {
+        console.error("[DrawCanvas] perfect-freehand error", err);
+      }
+    },
+    [thickness, opacity]
+  );
+
   const startDraw = (e: React.PointerEvent<HTMLCanvasElement>) => {
     e.currentTarget.setPointerCapture(e.pointerId);
     isDrawingRef.current = true;
     setHasContent(true);
-    const ctx = ctxRef.current;
-    if (!ctx) return;
-
     const { x, y } = getPos(e);
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.strokeStyle = `rgba(26, 26, 26, ${opacity})`;
-    ctx.lineWidth = thickness;
-    ctx.lineCap = tip;
-    ctx.lineJoin = "round";
-    lastPointRef.current = { x, y };
+    const pressure = typeof e.pressure === "number" ? e.pressure : 0.5;
+    currentStrokePointsRef.current = [[x, y, pressure]];
   };
 
   const draw = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -120,53 +153,39 @@ export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
     if (!ctx) return;
 
     const { x, y } = getPos(e);
-    const prev = lastPointRef.current;
-    if (!prev) {
-      ctx.lineTo(x, y);
-      ctx.stroke();
-      lastPointRef.current = { x, y };
-      return;
+    const pressure = typeof e.pressure === "number" ? e.pressure : 0.5;
+    const points = currentStrokePointsRef.current;
+    points.push([x, y, pressure]);
+
+    if (points.length >= 2) {
+      renderCurrentStroke(points, false);
     }
-
-    const dx = x - prev.x;
-    const dy = y - prev.y;
-    if (dx * dx + dy * dy < MIN_POINT_DISTANCE_SQ) return;
-
-    const midX = (prev.x + x) / 2;
-    const midY = (prev.y + y) / 2;
-
-    ctx.beginPath();
-    ctx.moveTo(prev.midX ?? prev.x, prev.midY ?? prev.y);
-    ctx.quadraticCurveTo(prev.x, prev.y, midX, midY);
-    ctx.stroke();
-
-    lastPointRef.current = { x, y, midX, midY };
   };
 
   const endDraw = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (isDrawingRef.current) {
-      const ctx = ctxRef.current;
-      const last = lastPointRef.current;
-      const endPos = getPos(e);
-      if (ctx && last) {
-        const finalPoint = { x: endPos.x, y: endPos.y };
-        const dx = finalPoint.x - last.x;
-        const dy = finalPoint.y - last.y;
-        if (dx * dx + dy * dy < MIN_POINT_DISTANCE_SQ) {
-          ctx.beginPath();
-          ctx.arc(last.x, last.y, thickness / 2, 0, Math.PI * 2);
-          ctx.fillStyle = ctx.strokeStyle;
-          ctx.fill();
-        } else {
-          ctx.beginPath();
-          ctx.moveTo(last.midX ?? last.x, last.midY ?? last.y);
-          ctx.quadraticCurveTo(last.x, last.y, finalPoint.x, finalPoint.y);
-          ctx.stroke();
-        }
-      }
+    if (!isDrawingRef.current) {
+      currentStrokePointsRef.current = [];
+      return;
     }
+    const ctx = ctxRef.current;
+    const points = currentStrokePointsRef.current;
+    const { x, y } = getPos(e);
+    const pressure = typeof e.pressure === "number" ? e.pressure : 0.5;
+    points.push([x, y, pressure]);
+
+    if (points.length === 1) {
+      ctx?.beginPath();
+      ctx?.arc(x, y, thickness / 2, 0, Math.PI * 2);
+      if (ctx) {
+        ctx.fillStyle = `rgba(26, 26, 26, ${opacity})`;
+        ctx.fill();
+      }
+    } else if (points.length >= 2) {
+      renderCurrentStroke(points, true);
+    }
+
     isDrawingRef.current = false;
-    lastPointRef.current = null;
+    currentStrokePointsRef.current = [];
   };
 
   const saveAndNext = useCallback(async () => {
