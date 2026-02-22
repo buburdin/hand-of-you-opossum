@@ -300,9 +300,13 @@ export default function DrawCanvas({ onComplete, initialGlyphs, onGlyphsChange }
     const newGlyphs = saveCurrent();
     if (!newGlyphs) return;
 
-    const idx = currentIndexRef.current;
-    if (idx < ALL_LETTERS.length - 1) {
-      setCurrentIndex(idx + 1);
+    // Pick a random undrawn letter next
+    const undrawn = ALL_LETTERS
+      .map((l, i) => ({ l, i }))
+      .filter(({ l }) => !(l in newGlyphs));
+    if (undrawn.length > 0) {
+      const pick = undrawn[Math.floor(Math.random() * undrawn.length)];
+      setCurrentIndex(pick.i);
     } else {
       onComplete(newGlyphs);
     }
@@ -350,29 +354,6 @@ export default function DrawCanvas({ onComplete, initialGlyphs, onGlyphsChange }
       transition={{ type: "spring", stiffness: 400, damping: 30 }}
       className="flex flex-col items-center gap-6 w-full max-w-lg mx-auto"
     >
-      {/* Progress bar */}
-      <div className="w-full">
-        <div className="flex justify-between items-center mb-2">
-          <span className="text-[10px] uppercase tracking-[0.2em] text-fg/40">
-            {Object.keys(drawnGlyphs).length} / {ALL_LETTERS.length}
-          </span>
-          <button
-            onClick={skipLetter}
-            className="text-[10px] uppercase tracking-[0.15em] text-fg/30 hover:text-fg/60 transition-colors"
-          >
-            skip
-          </button>
-        </div>
-        <div className="w-full h-[2px] bg-border rounded-full overflow-hidden">
-          <motion.div
-            className="h-full bg-fg/60 rounded-full"
-            initial={{ width: 0 }}
-            animate={{ width: `${progress * 100}%` }}
-            transition={{ type: "spring", stiffness: 400, damping: 30 }}
-          />
-        </div>
-      </div>
-
       {/* Letter display */}
       <div className="text-center">
         <AnimatePresence mode="wait">
@@ -482,15 +463,15 @@ export default function DrawCanvas({ onComplete, initialGlyphs, onGlyphsChange }
           className="px-5 py-2.5 rounded-full bg-fg text-bg text-xs tracking-wide hover:bg-fg/85 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
           style={{ boxShadow: "var(--shadow-sm)" }}
         >
-          {currentIndex < ALL_LETTERS.length - 1 ? "next" : "done"}
+          next
         </button>
-        {currentIndex < ALL_LETTERS.length - 1 && canFinish && (
+        {canFinish && (
           <button
             onClick={finishEarly}
             className="px-5 py-2.5 rounded-full border border-fg/20 text-xs tracking-wide text-fg/50 hover:border-fg/40 hover:text-fg/70 transition-colors"
             style={{ boxShadow: "var(--shadow-sm)" }}
           >
-            done
+            finish
           </button>
         )}
       </div>
