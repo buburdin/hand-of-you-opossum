@@ -45,29 +45,31 @@ export default function FontExport({
       transition={{ type: "spring", stiffness: 400, damping: 30, delay: 0.1 }}
       className="flex flex-col items-center gap-4"
     >
-      <div className="flex items-center gap-3">
-        <button
-          onClick={onExportImage}
-          className="px-5 py-2.5 rounded-full border border-border text-xs tracking-wide hover:border-fg/30 transition-colors"
-          style={{ boxShadow: "var(--shadow-sm)" }}
-        >
-          save as image
-        </button>
-        <button
-          onClick={handleDownloadTTF}
-          disabled={!ttfData}
-          className="px-5 py-2.5 rounded-full border border-border text-xs tracking-wide hover:border-fg/30 transition-colors disabled:opacity-30"
-          style={{ boxShadow: "var(--shadow-sm)" }}
-        >
-          download .ttf
-        </button>
+      <div className="flex flex-col md:flex-row items-center gap-3">
         <button
           onClick={onShare}
-          className="px-5 py-2.5 rounded-full bg-fg text-bg text-xs tracking-wide hover:bg-fg/85 transition-colors"
-          style={{ boxShadow: "var(--shadow-sm)" }}
+          className="md:order-3 w-full md:w-auto px-5 py-3 rounded-full bg-fg text-bg text-xs tracking-wide hover:bg-fg/85 transition-colors"
+          style={{ boxShadow: "var(--shadow-md)" }}
         >
           share
         </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onExportImage}
+            className="px-5 py-3 rounded-full border border-border text-xs tracking-wide hover:border-fg/30 transition-colors"
+            style={{ boxShadow: "var(--shadow-sm)" }}
+          >
+            save as image
+          </button>
+          <button
+            onClick={handleDownloadTTF}
+            disabled={!ttfData}
+            className="px-5 py-3 rounded-full border border-border text-xs tracking-wide hover:border-fg/30 transition-colors disabled:opacity-30"
+            style={{ boxShadow: "var(--shadow-sm)" }}
+          >
+            download .ttf
+          </button>
+        </div>
       </div>
 
       {charsFound.length > 0 && (
@@ -92,10 +94,17 @@ function buildImageOptions(): Parameters<typeof toPng>[1] {
   return options;
 }
 
+function buildDateSlug(): string {
+  const now = new Date();
+  const month = now.toLocaleString("en-US", { month: "short" }).toLowerCase();
+  const day = now.getDate();
+  return `${month}${day}`;
+}
+
 export async function exportElementAsImage(element: HTMLElement) {
   const dataUrl = await toPng(element, buildImageOptions());
   const link = document.createElement("a");
-  link.download = "my-handwriting-text.png";
+  link.download = `handofyou.app-${buildDateSlug()}.png`;
   link.href = dataUrl;
   link.click();
 }
@@ -119,7 +128,7 @@ export async function shareSticker(
 ): Promise<"shared" | "copied" | "failed"> {
   try {
     const blob = await renderShareImage(element);
-    const file = new File([blob], "my-handwriting.png", { type: "image/png" });
+    const file = new File([blob], `handofyou.app-${buildDateSlug()}.png`, { type: "image/png" });
 
     if (navigator.canShare?.({ files: [file] })) {
       await navigator.share({
