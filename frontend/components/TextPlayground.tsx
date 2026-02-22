@@ -31,6 +31,20 @@ const ROTATING_TEXTS = [
   "well, you tried",
 ];
 
+type NoteColor = {
+  id: string;
+  bg: string;
+  mid: string;
+  end: string;
+  swatch: string;
+};
+
+const NOTE_COLORS: NoteColor[] = [
+  { id: "yellow", bg: "#fff3a2", mid: "#ffed88", end: "#ffe277", swatch: "#ffe882" },
+  { id: "pink",   bg: "#ffd6e0", mid: "#ffc8d6", end: "#ffbacc", swatch: "#ffc4d0" },
+  { id: "blue",   bg: "#d4eaff", mid: "#c4dffb", end: "#b4d4f7", swatch: "#c4dffa" },
+];
+
 function pickRandom<T>(arr: T[], count: number): T[] {
   const shuffled = [...arr].sort(() => Math.random() - 0.5);
   return shuffled.slice(0, count);
@@ -40,6 +54,7 @@ const TextPlayground = forwardRef<TextPlaygroundHandle, TextPlaygroundProps>(
   function TextPlayground({ fontLoaded }, ref) {
   const [text, setText] = useState("this is my handwriting and i'm not sorry");
   const [fontSize, setFontSize] = useState(36);
+  const [noteColor, setNoteColor] = useState<NoteColor>(NOTE_COLORS[0]);
   const textDisplayRef = useRef<HTMLDivElement>(null);
   const fontFamily = getFontFamilyName();
   const sampleTexts = useMemo(() => [...pickRandom(ROTATING_TEXTS, 3), "abcdefghijklmnopqrstuvwxyz"], []);
@@ -70,6 +85,11 @@ const TextPlayground = forwardRef<TextPlaygroundHandle, TextPlaygroundProps>(
         }`}
         style={{
           boxShadow: fontLoaded ? "var(--shadow-sticky)" : "var(--shadow-md)",
+          ...(fontLoaded
+            ? {
+                background: `linear-gradient(135deg, ${noteColor.bg} 0%, ${noteColor.mid} 60%, ${noteColor.end} 100%)`,
+              }
+            : {}),
         }}
       >
         <textarea
@@ -91,8 +111,27 @@ const TextPlayground = forwardRef<TextPlaygroundHandle, TextPlaygroundProps>(
         )}
       </div>
 
-      {/* Font size slider */}
+      {/* Note color + font size controls */}
       <div className="flex items-center gap-4 w-full">
+        <div className="flex items-center gap-1.5">
+          {NOTE_COLORS.map((color) => (
+            <button
+              key={color.id}
+              onClick={() => setNoteColor(color)}
+              aria-label={`${color.id} note`}
+              className="w-5 h-5 rounded-full border transition-all"
+              style={{
+                backgroundColor: color.swatch,
+                borderColor:
+                  noteColor.id === color.id
+                    ? "rgba(26, 26, 26, 0.45)"
+                    : "rgba(26, 26, 26, 0.12)",
+                transform: noteColor.id === color.id ? "scale(1.15)" : "scale(1)",
+              }}
+            />
+          ))}
+        </div>
+        <div className="w-px h-3 bg-border" />
         <span className="text-[10px] uppercase tracking-[0.15em] text-fg/40 whitespace-nowrap">
           size
         </span>

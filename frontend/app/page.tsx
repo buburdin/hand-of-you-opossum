@@ -25,7 +25,7 @@ const spring = { type: "spring" as const, stiffness: 400, damping: 30 };
 
 export default function Home() {
   const [step, setStep] = useState<Step>("landing");
-  const [mode, setMode] = useState<Mode>("snap");
+  const [mode, setMode] = useState<Mode>("draw");
   const [processingStep, setProcessingStep] = useState(0);
   const [fontResult, setFontResult] = useState<FontResult | null>(null);
   const [fontLoaded, setFontLoaded] = useState(false);
