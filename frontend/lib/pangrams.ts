@@ -47,8 +47,8 @@ export const LETTER_CATEGORY: Record<string, LetterCategory> = {
 // Canvas guide line positions (fraction of canvas height, top=0)
 // Matches font metrics: ASCENDER=800, X_HEIGHT=500, BASELINE=0, DESCENDER=-200
 export const GUIDE_LINES = {
-  ascender: 0,     // top
-  xHeight: 0.30,   // 30% from top
-  baseline: 0.80,  // 80% from top
-  descender: 1.0,  // bottom
+  ascender: 0.05,  // 5% from top
+  xHeight: 0.31,   // 31% from top
+  baseline: 0.75,  // 75% from top
+  descender: 0.92, // 92% from top
 } as const;

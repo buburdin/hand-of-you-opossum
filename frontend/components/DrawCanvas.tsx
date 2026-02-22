@@ -31,7 +31,7 @@ interface DrawCanvasProps {
 /** Ghost letter font-size in container-query-height units so it scales with the canvas.
  *  Calibrated for JetBrains Mono (ascender 1020, descender -300, x-height 536, UPM 1000)
  *  so that lowercase x-height ≈ the x-height guide line (30%) and caps fill to near the top. */
-const GHOST_FONT_SIZE = '88cqh';
+const GHOST_FONT_SIZE = '77cqh';
 
 const THICKNESS_OPTIONS = [
   { label: "S", value: 2 },
@@ -187,10 +187,12 @@ export default function DrawCanvas({ onComplete, initialGlyphs, onGlyphsChange }
       try {
         const outline = getStroke(points, {
           size: thickness,
-          thinning: 0.5,
+          thinning: 0.15,
           smoothing: 0.5,
           streamline: 0.6,
           simulatePressure: false,
+          start: { taper: false },
+          end: { taper: false },
           last,
         });
         if (outline.length < 4) return;
@@ -363,7 +365,7 @@ export default function DrawCanvas({ onComplete, initialGlyphs, onGlyphsChange }
 
       {/* Drawing canvas */}
       <div
-        className="drawing-canvas w-full aspect-square rounded-xl border border-border bg-paper relative overflow-hidden"
+        className="drawing-canvas w-full aspect-[5/6] rounded-xl border border-border bg-paper relative overflow-hidden"
         style={{ boxShadow: "var(--shadow-md)", maxWidth: "300px", containerType: "size" }}
       >
         <canvas
@@ -411,7 +413,7 @@ export default function DrawCanvas({ onComplete, initialGlyphs, onGlyphsChange }
         <input
           type="range"
           min={1}
-          max={20}
+          max={40}
           step={1}
           value={thickness}
           onChange={(e) => setThickness(Number(e.target.value))}

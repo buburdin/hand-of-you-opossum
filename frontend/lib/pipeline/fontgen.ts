@@ -5,6 +5,7 @@
 
 import opentype from "opentype.js";
 import type { VectorizedGlyph } from "./vectorize";
+import { GUIDE_LINES } from "../pangrams";
 
 // Font metrics
 const UNITS_PER_EM = 1000;
@@ -265,13 +266,53 @@ function transformToFontCoords(
   let transform: (x: number, y: number) => [number, number];
 
   if (useUniformScale) {
-    // Uniform mode: preserve absolute Y position from potrace.
-    // potrace y=0 → descender, y=referenceHeight → ascender
+    // Guide lines don't span the full canvas — account for padding
+    const descYFrac = 1 - GUIDE_LINES.descender; // fraction from bottom (potrace Y-up)
+    const ascYFrac  = 1 - GUIDE_LINES.ascender;
+    const effectiveHeight = (ascYFrac - descYFrac) * referenceHeight;
+    const potraceDescY = descYFrac * referenceHeight;
+    const uniformScale = TARGET_HEIGHT / effectiveHeight;
+    const scaledWidth = Math.round(bw * uniformScale);
+    const uniformBearing = Math.round(scaledWidth * 0.12);
+
     transform = (x: number, y: number): [number, number] => {
-      const fx = (x - bbox.minX) * scale + bearing;
-      const fy = y * scale + DESCENDER;
+      const fx = (x - bbox.minX) * uniformScale + uniformBearing;
+      const fy = (y - potraceDescY) * uniformScale + DESCENDER;
       return [Math.round(fx), Math.round(fy)];
     };
+
+    // Return early with correct advanceWidth using the uniform scale
+    const uniformAdvanceWidth = scaledWidth + uniformBearing * 2;
+
+    const transformed: PathCommand[] = [];
+    for (const cmd of cmds) {
+      switch (cmd.type) {
+        case "M":
+        case "L": {
+          const [x, y] = transform(cmd.x, cmd.y);
+          transformed.push({ type: cmd.type, x, y });
+          break;
+        }
+        case "C": {
+          const [x, y] = transform(cmd.x, cmd.y);
+          const [x1, y1] = transform(cmd.x1, cmd.y1);
+          const [x2, y2] = transform(cmd.x2, cmd.y2);
+          transformed.push({ type: "C", x, y, x1, y1, x2, y2 });
+          break;
+        }
+        case "Q": {
+          const [x, y] = transform(cmd.x, cmd.y);
+          const [x1, y1] = transform(cmd.x1, cmd.y1);
+          transformed.push({ type: "Q", x, y, x1, y1 });
+          break;
+        }
+        case "Z":
+          transformed.push({ type: "Z" });
+          break;
+      }
+    }
+
+    return { commands: transformed, advanceWidth: uniformAdvanceWidth, lsb: uniformBearing };
   } else {
     const yBase = punctuation ? DESCENDER + punctuation.yOffset : DESCENDER;
     transform = (x: number, y: number): [number, number] => {
