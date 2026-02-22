@@ -52,11 +52,18 @@ const TIP_OPTIONS = [
   { label: "flat", value: "square" as CanvasLineCap },
 ] as const;
 
+interface CompletedStroke {
+  pathData: string;
+  fillStyle: string;
+}
+
 export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
   const currentStrokePointsRef = useRef<[number, number, number][]>([]);
   const isDrawingRef = useRef(false);
+  const completedStrokesRef = useRef<CompletedStroke[]>([]);
+  const backgroundImageRef = useRef<HTMLImageElement | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [drawnGlyphs, setDrawnGlyphs] = useState<Record<string, Blob>>({});
   const [hasContent, setHasContent] = useState(false);
@@ -91,8 +98,35 @@ export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
     ctx.fillRect(0, 0, rect.width, rect.height);
   }, []);
 
+  const redrawAll = useCallback(() => {
+    const ctx = ctxRef.current;
+    const canvas = canvasRef.current;
+    if (!ctx || !canvas) return;
+    const rect = canvas.getBoundingClientRect();
+
+    // Clear to white
+    ctx.clearRect(0, 0, rect.width, rect.height);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, rect.width, rect.height);
+
+    // Draw restored background image if present
+    const bgImg = backgroundImageRef.current;
+    if (bgImg) {
+      ctx.drawImage(bgImg, 0, 0, rect.width, rect.height);
+    }
+
+    // Replay all completed strokes
+    for (const stroke of completedStrokesRef.current) {
+      const path = new Path2D(stroke.pathData);
+      ctx.fillStyle = stroke.fillStyle;
+      ctx.fill(path);
+    }
+  }, []);
+
   const clearCanvas = useCallback(() => {
     clearCanvasSurface();
+    completedStrokesRef.current = [];
+    backgroundImageRef.current = null;
     setHasContent(false);
     currentStrokePointsRef.current = [];
     isDrawingRef.current = false;
@@ -116,6 +150,8 @@ export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
     clearCanvasSurface();
     currentStrokePointsRef.current = [];
     isDrawingRef.current = false;
+    completedStrokesRef.current = [];
+    backgroundImageRef.current = null;
 
     // Restore previously saved glyph if it exists
     const letter = ALL_LETTERS[currentIndex];
@@ -124,7 +160,8 @@ export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
       const url = URL.createObjectURL(savedBlob);
       const img = new Image();
       img.onload = () => {
-        ctx.drawImage(img, 0, 0, rect.width, rect.height);
+        backgroundImageRef.current = img;
+        redrawAll();
         URL.revokeObjectURL(url);
         setHasContent(true);
       };
@@ -132,7 +169,7 @@ export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
     } else {
       setHasContent(false);
     }
-  }, [clearCanvasSurface, currentIndex]);
+  }, [clearCanvasSurface, redrawAll, currentIndex]);
 
   const getPos = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -153,20 +190,19 @@ export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
           size: thickness,
           thinning: 0.5,
           smoothing: 0.5,
-          streamline: 0.5,
+          streamline: 0.6,
           simulatePressure: false,
           last,
         });
         if (outline.length < 4) return;
         const pathData = getSvgPathFromStroke(outline);
-        const path = new Path2D(pathData);
-        ctx.fillStyle = `rgba(26, 26, 26, ${opacity})`;
-        ctx.fill(path);
+        return pathData;
       } catch (err) {
         console.error("[DrawCanvas] perfect-freehand error", err);
+        return undefined;
       }
     },
-    [thickness, opacity]
+    [thickness]
   );
 
   const startDraw = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -189,7 +225,13 @@ export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
     points.push([x, y, pressure]);
 
     if (points.length >= 2) {
-      renderCurrentStroke(points, false);
+      const pathData = renderCurrentStroke(points, false);
+      if (pathData) {
+        redrawAll();
+        const path = new Path2D(pathData);
+        ctx.fillStyle = `rgba(26, 26, 26, ${opacity})`;
+        ctx.fill(path);
+      }
     }
   };
 
@@ -198,23 +240,26 @@ export default function DrawCanvas({ onComplete }: DrawCanvasProps) {
       currentStrokePointsRef.current = [];
       return;
     }
-    const ctx = ctxRef.current;
     const points = currentStrokePointsRef.current;
     const { x, y } = getPos(e);
     const pressure = typeof e.pressure === "number" ? e.pressure : 0.5;
     points.push([x, y, pressure]);
 
+    const fillStyle = `rgba(26, 26, 26, ${opacity})`;
+
     if (points.length === 1) {
-      ctx?.beginPath();
-      ctx?.arc(x, y, thickness / 2, 0, Math.PI * 2);
-      if (ctx) {
-        ctx.fillStyle = `rgba(26, 26, 26, ${opacity})`;
-        ctx.fill();
+      // Single-point dot — store as a circular path
+      const r = thickness / 2;
+      const pathData = `M${x + r},${y} A${r},${r} 0 1,1 ${x - r},${y} A${r},${r} 0 1,1 ${x + r},${y}Z`;
+      completedStrokesRef.current.push({ pathData, fillStyle });
+    } else {
+      const pathData = renderCurrentStroke(points, true);
+      if (pathData) {
+        completedStrokesRef.current.push({ pathData, fillStyle });
       }
-    } else if (points.length >= 2) {
-      renderCurrentStroke(points, true);
     }
 
+    redrawAll();
     isDrawingRef.current = false;
     currentStrokePointsRef.current = [];
   };
