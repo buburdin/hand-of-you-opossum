@@ -22,7 +22,7 @@ const PUNCTUATION_METRICS: Record<string, { scale: number; yOffset: number }> = 
   ".":  { scale: 0.12, yOffset: 0 },     // baseline
   ",":  { scale: 0.20, yOffset: -80 },    // slightly below baseline
   "-":  { scale: 0.10, yOffset: 250 },    // mid x-height
-  "'":  { scale: 0.18, yOffset: 520 },    // near cap height
+  "\u2019":  { scale: 0.18, yOffset: 520 },    // near cap height
 };
 
 // ─── SVG path parsing ────────────────────────────────────────────────────────
