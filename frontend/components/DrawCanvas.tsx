@@ -344,24 +344,10 @@ export default function DrawCanvas({ onComplete, initialGlyphs, onGlyphsChange }
       transition={{ type: "spring", stiffness: 400, damping: 30 }}
       className="flex flex-col items-center gap-6 w-full max-w-lg mx-auto"
     >
-      {/* Letter display */}
-      <div className="text-center">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentLetter}
-            initial={{ opacity: 0, y: 8, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -8, scale: 0.95 }}
-            transition={{ type: "spring", stiffness: 500, damping: 30 }}
-            className="text-6xl font-medium mb-1"
-          >
-            {currentLetter}
-          </motion.div>
-        </AnimatePresence>
-        <p className="text-[10px] uppercase tracking-[0.2em] text-fg/35">
-          draw this letter
-        </p>
-      </div>
+      {/* Letter label */}
+      <p className="text-[10px] uppercase tracking-[0.2em] text-fg/35">
+        draw this letter
+      </p>
 
       {/* Drawing canvas */}
       <div

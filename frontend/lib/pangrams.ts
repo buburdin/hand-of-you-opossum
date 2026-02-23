@@ -26,7 +26,7 @@ export function getUniqueChars(pangram: string): string[] {
 }
 
 // All 26 letters + digits + punctuation for draw mode
-export const ALL_LETTERS = [..."abcdefghijklmnopqrstuvwxyz", ..."0123456789", ",", ".", "-", "'"];
+export const ALL_LETTERS = [..."abcdefghijklmnopqrstuvwxyz", ..."0123456789", ",", ".", "-", "\u2019", "!", "?"];
 
 // ─── Letter categories for typographic guide lines ────────────────────────────
 
@@ -41,7 +41,8 @@ export const LETTER_CATEGORY: Record<string, LetterCategory> = {
   g: 'descender', j: 'descender', p: 'descender', q: 'descender', y: 'descender',
   '0': 'number', '1': 'number', '2': 'number', '3': 'number', '4': 'number',
   '5': 'number', '6': 'number', '7': 'number', '8': 'number', '9': 'number',
-  ',': 'punctuation', '.': 'punctuation', '-': 'punctuation', "'": 'punctuation',
+  ',': 'punctuation', '.': 'punctuation', '-': 'punctuation', '\u2019': 'punctuation',
+  '!': 'punctuation', '?': 'punctuation',
 };
 
 // Canvas guide line positions (fraction of canvas height, top=0)
