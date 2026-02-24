@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { PipelineDebugData } from "@/lib/pipeline";
 
@@ -20,6 +20,17 @@ export default function DebugOverlay({ debug }: DebugOverlayProps) {
   const [activeStage, setActiveStage] = useState(0);
 
   const currentImage = debug[stages[activeStage].key];
+
+  const downloadAllImages = useCallback(() => {
+    for (const stage of stages) {
+      const dataUrl = debug[stage.key];
+      if (!dataUrl) continue;
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = `debug-${stage.key}.png`;
+      a.click();
+    }
+  }, [debug]);
 
   return (
     <div className="w-full max-w-2xl mx-auto">
@@ -53,9 +64,21 @@ export default function DebugOverlay({ debug }: DebugOverlayProps) {
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="mt-4 rounded-xl border border-border bg-bg p-4 space-y-4"
+            <div className="mt-4 rounded-xl border border-border bg-bg p-4 space-y-4 relative"
               style={{ boxShadow: "var(--shadow-md)" }}
             >
+              <button
+                onClick={downloadAllImages}
+                title="Download all debug images"
+                className="absolute top-3 right-3 p-1.5 rounded-md text-fg/30 hover:text-fg/60 hover:bg-fg/5 transition-colors"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+              </button>
+
               {/* Stats bar */}
               <div className="flex flex-wrap gap-4 text-[10px] uppercase tracking-[0.15em] text-fg/40">
                 <span>

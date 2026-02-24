@@ -2,6 +2,10 @@
 
 Turn your handwriting into a font. Snap a photo of a pangram or draw letters on screen — get a real font file you can use anywhere.
 
+<p align="center">
+  <img src="docs/screenshots/result.png" width="600" alt="Typing with a generated handwriting font">
+</p>
+
 ## Stack
 
 - **Next.js** (app runs entirely in the browser + one API route)
@@ -48,6 +52,10 @@ Open [http://localhost:3000](http://localhost:3000).
    - Generate OTF font (opentype.js)
 4. **Type** with your new font, download .otf, or save text as an image
 
+## Debug Mode
+
+Add `?debug` to the URL (e.g. `http://localhost:3000/?debug`) and then process a photo or drawing. After the font is generated, a debug overlay will appear showing each pipeline stage (preprocessing, segmentation, vectorization, font generation) with intermediate images and timing data.
+
 ## Project Structure
 
 ```
@@ -63,3 +71,13 @@ frontend/
 │   └── pangrams.ts    Pangram collection
 └── public/            Static assets
 ```
+
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/landing.png" width="600" alt="Landing page">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/draw.png" width="600" alt="Drawing letters on screen">
+</p>

@@ -285,7 +285,7 @@ export default function Home() {
               <FontExport
                 ttfData={fontResult?.ttf ?? null}
                 charsFound={charsFound}
-                onEditLetters={handleEditLetters}
+                onEditLetters={mode === "draw" ? handleEditLetters : undefined}
                 onExportImage={() => {
                   const el = playgroundRef.current?.getDisplayElement();
                   if (el) exportElementAsImage(el).catch(() => {
@@ -302,18 +302,7 @@ export default function Home() {
                   }
                 }}
               />
-              {debugData ? (
-                <DebugOverlay debug={debugData} />
-              ) : (
-                <div className="w-full max-w-2xl mx-auto">
-                  <a
-                    href="/?debug"
-                    className="flex items-center justify-center gap-2 text-[10px] uppercase tracking-[0.2em] text-fg/35 hover:text-fg/60 transition-colors"
-                  >
-                    Pipeline debug: add ?debug to URL and process again to see pipeline stages
-                  </a>
-                </div>
-              )}
+              {debugData && <DebugOverlay debug={debugData} />}
             </motion.div>
           )}
         </AnimatePresence>
