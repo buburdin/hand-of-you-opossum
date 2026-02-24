@@ -11,6 +11,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@vercel/analytics": "^1.6.1",
     "esm-potrace-wasm": "^0.4.1",
     "framer-motion": "^12.33.0",
     "html-to-image": "^1.11.13",
