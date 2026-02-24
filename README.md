@@ -2,9 +2,7 @@
 
 Turn your handwriting into a font. Snap a photo of a pangram or draw letters on screen — get a real font file you can use anywhere.
 
-<p align="center">
-  <img src="docs/screenshots/result.png" width="600" alt="Typing with a generated handwriting font">
-</p>
+<img src="docs/screenshots/result.png" width="750" alt="Typing with a generated handwriting font">
 
 ## Stack
 
@@ -74,10 +72,6 @@ frontend/
 
 ## Screenshots
 
-<p align="center">
-  <img src="docs/screenshots/landing.png" width="600" alt="Landing page">
-</p>
+<img src="docs/screenshots/landing.png" width="750" alt="Landing page">
 
-<p align="center">
-  <img src="docs/screenshots/draw.png" width="600" alt="Drawing letters on screen">
-</p>
+<img src="docs/screenshots/draw.png" width="750" alt="Drawing letters on screen">
