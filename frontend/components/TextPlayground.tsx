@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useRef, useMemo, forwardRef, useImperativeHandle } from "react";
+import { useState, useRef, useMemo, useEffect, forwardRef, useImperativeHandle } from "react";
 import { motion } from "framer-motion";
 import { getFontFamilyName } from "@/lib/fontLoader";
+import { loadPlayground, savePlayground } from "@/lib/sessionStore";
 
 interface TextPlaygroundProps {
   fontLoaded: boolean;
@@ -52,10 +53,17 @@ function pickRandom<T>(arr: T[], count: number): T[] {
 
 const TextPlayground = forwardRef<TextPlaygroundHandle, TextPlaygroundProps>(
   function TextPlayground({ fontLoaded }, ref) {
-  const [text, setText] = useState("this is my handwriting and i'm not sorry");
-  const [fontSize, setFontSize] = useState(64);
-  const [noteColor, setNoteColor] = useState<NoteColor>(NOTE_COLORS[0]);
+  const saved = useMemo(() => loadPlayground(), []);
+  const [text, setText] = useState(saved?.text ?? "this is my handwriting and i'm not sorry");
+  const [fontSize, setFontSize] = useState(saved?.fontSize ?? 64);
+  const [noteColor, setNoteColor] = useState<NoteColor>(
+    NOTE_COLORS.find((c) => c.id === saved?.noteColorId) ?? NOTE_COLORS[0],
+  );
   const textDisplayRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    savePlayground({ text, fontSize, noteColorId: noteColor.id });
+  }, [text, fontSize, noteColor]);
   const fontFamily = getFontFamilyName();
   const sampleTexts = useMemo(() => [...pickRandom(ROTATING_TEXTS, 3), "abcdefghijklmnopqrstuvwxyz"], []);
 

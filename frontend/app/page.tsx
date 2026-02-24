@@ -16,6 +16,7 @@ import {
   type PipelineDebugData,
 } from "@/lib/pipeline";
 import { loadFont } from "@/lib/fontLoader";
+import { saveSession, loadSession, clearSession, saveDrawProgress, loadDrawProgress, clearDrawProgress } from "@/lib/sessionStore";
 import DebugOverlay from "@/components/DebugOverlay";
 
 type Step = "landing" | "input" | "processing" | "playground";
@@ -39,9 +40,33 @@ export default function Home() {
 
   const collectDebug = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("debug");
 
-  // Avoid SSR opacity:0 — only animate after hydration
   useEffect(() => {
     setMounted(true);
+
+    const saved = loadSession();
+    if (saved) {
+      loadFont(saved.fontBuffer).then(() => {
+        setFontLoaded(true);
+        setCharsFound(saved.charsFound);
+        setMode(saved.mode);
+        setFontResult({ ttf: saved.fontBuffer, charsFound: saved.charsFound });
+        setStep("playground");
+      }).catch(() => {
+        clearSession();
+      });
+    } else {
+      const savedGlyphs = loadDrawProgress();
+      if (savedGlyphs) {
+        setDrawnGlyphs(savedGlyphs);
+        setMode("draw");
+        setStep("input");
+      }
+    }
+  }, []);
+
+  const handleGlyphsChange = useCallback((glyphs: Record<string, Blob>) => {
+    setDrawnGlyphs(glyphs);
+    saveDrawProgress(glyphs);
   }, []);
 
   const handleStart = () => {
@@ -68,6 +93,8 @@ export default function Home() {
         await loadFont(result.ttf);
         setFontLoaded(true);
         setCharsFound(result.charsFound);
+        clearDrawProgress();
+        saveSession(result.ttf, result.charsFound, "snap");
 
         setTimeout(() => setStep("playground"), 500);
       } catch (err) {
@@ -98,6 +125,8 @@ export default function Home() {
         await loadFont(result.ttf);
         setFontLoaded(true);
         setCharsFound(result.charsFound);
+        clearDrawProgress();
+        saveSession(result.ttf, result.charsFound, "draw");
 
         setTimeout(() => setStep("playground"), 500);
       } catch (err) {
@@ -111,6 +140,7 @@ export default function Home() {
   );
 
   const handleStartOver = () => {
+    clearSession();
     setStep("landing");
     setFontResult(null);
     setFontLoaded(false);
@@ -226,7 +256,7 @@ export default function Home() {
                     key="draw"
                     onComplete={handleDrawComplete}
                     initialGlyphs={drawnGlyphs}
-                    onGlyphsChange={setDrawnGlyphs}
+                    onGlyphsChange={handleGlyphsChange}
                   />
                 )}
               </AnimatePresence>
