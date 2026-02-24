@@ -10,6 +10,8 @@ Turn your handwriting into a font. Snap a photo of a pangram or draw letters on 
 - **Google Cloud Vision API** — character recognition from handwriting photos
 - **esm-potrace-wasm** — bitmap-to-vector tracing (runs in browser via WASM)
 - **opentype.js** — font generation (runs in browser)
+- **perfect-freehand** — smooth stroke rendering for the draw-on-screen mode
+- **html-to-image** — export rendered text as an image
 - **Tailwind CSS v4**, **Framer Motion** — UI
 
 ## Getting Started
