@@ -104,6 +104,9 @@ const TextPlayground = forwardRef<TextPlaygroundHandle, TextPlaygroundProps>(
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="start typing..."
+          spellCheck={false}
+          autoCorrect="off"
+          autoCapitalize="off"
           className="absolute inset-0 w-full h-full resize-none bg-transparent border-0 outline-none font-preview break-words p-8 pb-14 placeholder:opacity-30"
           style={{
             fontFamily: fontLoaded ? `"${fontFamily}", sans-serif` : "inherit",
@@ -156,8 +159,8 @@ const TextPlayground = forwardRef<TextPlaygroundHandle, TextPlaygroundProps>(
         </span>
       </div>
 
-      {/* Sample text pills */}
-      <div className="flex flex-wrap gap-2 justify-center">
+      {/* Sample text pills — hidden for now */}
+      {/* <div className="flex flex-wrap gap-2 justify-center">
         {sampleTexts.map((sample) => (
           <button
             key={sample}
@@ -167,7 +170,7 @@ const TextPlayground = forwardRef<TextPlaygroundHandle, TextPlaygroundProps>(
             {sample}
           </button>
         ))}
-      </div>
+      </div> */}
 
     </motion.div>
   );
