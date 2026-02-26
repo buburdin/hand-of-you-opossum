@@ -391,6 +391,10 @@ export interface FontResult {
   ttf: ArrayBuffer;
   /** Characters that were included in the font */
   charsFound: string[];
+  /** Vectorized glyph data retained for re-generation with a custom font name */
+  glyphs: Record<string, VectorizedGlyph>;
+  /** Reference height used during generation (draw mode only) */
+  referenceHeight?: number;
 }
 
 /**
@@ -507,5 +511,7 @@ export function generateFont(
   return {
     ttf: font.toArrayBuffer(),
     charsFound,
+    glyphs,
+    referenceHeight,
   };
 }

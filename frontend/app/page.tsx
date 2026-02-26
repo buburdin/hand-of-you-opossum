@@ -49,7 +49,12 @@ export default function Home() {
         setFontLoaded(true);
         setCharsFound(saved.charsFound);
         setMode(saved.mode);
-        setFontResult({ ttf: saved.fontBuffer, charsFound: saved.charsFound });
+        setFontResult({
+          ttf: saved.fontBuffer,
+          charsFound: saved.charsFound,
+          glyphs: saved.glyphs ?? {},
+          referenceHeight: saved.referenceHeight,
+        });
         setStep("playground");
       }).catch(() => {
         clearSession();
@@ -94,7 +99,7 @@ export default function Home() {
         setFontLoaded(true);
         setCharsFound(result.charsFound);
         clearDrawProgress();
-        saveSession(result.ttf, result.charsFound, "snap");
+        saveSession(result.ttf, result.charsFound, "snap", result.glyphs, result.referenceHeight);
 
         setTimeout(() => setStep("playground"), 500);
       } catch (err) {
@@ -126,7 +131,7 @@ export default function Home() {
         setFontLoaded(true);
         setCharsFound(result.charsFound);
         clearDrawProgress();
-        saveSession(result.ttf, result.charsFound, "draw");
+        saveSession(result.ttf, result.charsFound, "draw", result.glyphs, result.referenceHeight);
 
         setTimeout(() => setStep("playground"), 500);
       } catch (err) {
@@ -285,6 +290,8 @@ export default function Home() {
               <FontExport
                 ttfData={fontResult?.ttf ?? null}
                 charsFound={charsFound}
+                glyphs={fontResult?.glyphs}
+                referenceHeight={fontResult?.referenceHeight}
                 onEditLetters={mode === "draw" ? handleEditLetters : undefined}
                 onExportImage={() => {
                   const el = playgroundRef.current?.getDisplayElement();

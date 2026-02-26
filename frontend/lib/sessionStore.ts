@@ -2,10 +2,14 @@ const SESSION_KEY = "hoy-session";
 const PLAYGROUND_KEY = "hoy-playground";
 const DRAW_KEY = "hoy-draw";
 
+import type { VectorizedGlyph } from "./pipeline/vectorize";
+
 export interface SavedSession {
   fontBase64: string;
   charsFound: string[];
   mode: "snap" | "draw";
+  glyphs?: Record<string, VectorizedGlyph>;
+  referenceHeight?: number;
 }
 
 export interface SavedPlayground {
@@ -37,12 +41,16 @@ export function saveSession(
   fontBuffer: ArrayBuffer,
   charsFound: string[],
   mode: "snap" | "draw",
+  glyphs?: Record<string, VectorizedGlyph>,
+  referenceHeight?: number,
 ): void {
   try {
     const data: SavedSession = {
       fontBase64: arrayBufferToBase64(fontBuffer),
       charsFound,
       mode,
+      glyphs,
+      referenceHeight,
     };
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(data));
   } catch {
