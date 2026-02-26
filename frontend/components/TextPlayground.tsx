@@ -14,22 +14,15 @@ export interface TextPlaygroundHandle {
 }
 
 const ROTATING_TEXTS = [
-  "sir this is a wendy's",
   "autocorrect can't save you here",
-  "somewhere between chaos and cursive",
   "this is my handwriting and i'm not sorry",
-  "the quick brown fox got a restraining order",
-  "pack my box with five dozen existential crises",
   "i write like a doctor but on purpose",
-  "you could've just used arial but here we are",
-  "i made a font instead of going to therapy",
-  "this font knows where you live",
+  "you could've just used arial",
   "handmade in a machine-made world",
   "a love letter to imperfection",
   "congrats, you're a type designer now",
   "type anything, it'll look like you wrote it",
-  "OK",
-  "well, you tried",
+  "OK Computer",
 ];
 
 type NoteColor = {
@@ -54,7 +47,7 @@ function pickRandom<T>(arr: T[], count: number): T[] {
 const TextPlayground = forwardRef<TextPlaygroundHandle, TextPlaygroundProps>(
   function TextPlayground({ fontLoaded }, ref) {
   const saved = useMemo(() => loadPlayground(), []);
-  const [text, setText] = useState(saved?.text ?? "this is my handwriting and i'm not sorry");
+  const [text, setText] = useState(saved?.text ?? ROTATING_TEXTS[Math.floor(Math.random() * ROTATING_TEXTS.length)]);
   const [fontSize, setFontSize] = useState(saved?.fontSize ?? 64);
   const [noteColor, setNoteColor] = useState<NoteColor>(
     NOTE_COLORS.find((c) => c.id === saved?.noteColorId) ?? NOTE_COLORS[0],
