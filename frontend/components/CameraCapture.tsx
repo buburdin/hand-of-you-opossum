@@ -29,7 +29,9 @@ export default function CameraCapture({
   const streamRef = useRef<MediaStream | null>(null);
   const [status, setStatus] = useState<CameraStatus>(() => {
     if (typeof navigator === "undefined") return "initializing";
-    return navigator.mediaDevices?.getUserMedia ? "initializing" : "not-supported";
+    return typeof navigator.mediaDevices?.getUserMedia === "function"
+      ? "initializing"
+      : "not-supported";
   });
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null);
