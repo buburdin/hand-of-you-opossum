@@ -4,6 +4,7 @@ import { useRef, useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getStroke } from "perfect-freehand";
 import { ALL_LETTERS, GUIDE_LINES } from "@/lib/pangrams";
+import { useAppHaptics } from "@/lib/haptics";
 
 /** Turns perfect-freehand outline points into an SVG path string for Path2D/fill. */
 function getSvgPathFromStroke(points: number[][], closed = true): string {
@@ -69,20 +70,30 @@ export default function DrawCanvas({ onComplete, initialGlyphs, onGlyphsChange }
 
   // Refs to avoid stale closures in async save callbacks
   const drawnGlyphsRef = useRef(drawnGlyphs);
-  drawnGlyphsRef.current = drawnGlyphs;
   const hasContentRef = useRef(hasContent);
-  hasContentRef.current = hasContent;
   const currentIndexRef = useRef(currentIndex);
-  currentIndexRef.current = currentIndex;
 
   // Brush settings
   const [thickness, setThickness] = useState(24);
   const [opacity, setOpacity] = useState(1);
   const [tip, setTip] = useState<CanvasLineCap>("round");
   const [showSettings, setShowSettings] = useState(false);
+  const haptics = useAppHaptics();
 
   const currentLetter = ALL_LETTERS[currentIndex];
   const progress = Object.keys(drawnGlyphs).length / ALL_LETTERS.length;
+
+  useEffect(() => {
+    drawnGlyphsRef.current = drawnGlyphs;
+  }, [drawnGlyphs]);
+
+  useEffect(() => {
+    hasContentRef.current = hasContent;
+  }, [hasContent]);
+
+  useEffect(() => {
+    currentIndexRef.current = currentIndex;
+  }, [currentIndex]);
 
   const clearCanvasSurface = useCallback(() => {
     const ctx = ctxRef.current;
@@ -123,18 +134,20 @@ export default function DrawCanvas({ onComplete, initialGlyphs, onGlyphsChange }
   }, []);
 
   const clearCanvas = useCallback(() => {
+    haptics.warning();
     clearCanvasSurface();
     completedStrokesRef.current = [];
     backgroundImageRef.current = null;
     setHasContent(false);
     currentStrokePointsRef.current = [];
     isDrawingRef.current = false;
-  }, [clearCanvasSurface]);
+  }, [clearCanvasSurface, haptics]);
 
   // Initialize canvas
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    let frame = 0;
 
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
     const rect = canvas.getBoundingClientRect();
@@ -166,8 +179,12 @@ export default function DrawCanvas({ onComplete, initialGlyphs, onGlyphsChange }
       };
       img.src = url;
     } else {
-      setHasContent(false);
+      frame = window.requestAnimationFrame(() => setHasContent(false));
     }
+
+    return () => {
+      if (frame) window.cancelAnimationFrame(frame);
+    };
   }, [clearCanvasSurface, redrawAll, currentIndex]);
 
   const getPos = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -295,18 +312,21 @@ export default function DrawCanvas({ onComplete, initialGlyphs, onGlyphsChange }
       .map((l, i) => ({ l, i }))
       .filter(({ l }) => !(l in newGlyphs));
     if (undrawn.length > 0) {
+      haptics.medium();
       const pick = undrawn[Math.floor(Math.random() * undrawn.length)];
       setCurrentIndex(pick.i);
     } else {
+      haptics.medium();
       onComplete(newGlyphs);
     }
-  }, [saveCurrent, onComplete]);
+  }, [haptics, saveCurrent, onComplete]);
 
   const goToLetter = useCallback((i: number) => {
     if (i === currentIndexRef.current) return;
+    haptics.selection();
     saveCurrent();
     setCurrentIndex(i);
-  }, [saveCurrent]);
+  }, [haptics, saveCurrent]);
 
   // Keyboard shortcut: Enter → next/done
   useEffect(() => {
@@ -331,8 +351,9 @@ export default function DrawCanvas({ onComplete, initialGlyphs, onGlyphsChange }
   const finishEarly = useCallback(() => {
     // Save current letter if it has content, then complete
     const glyphs = saveCurrent() ?? drawnGlyphsRef.current;
+    haptics.medium();
     onComplete(glyphs);
-  }, [saveCurrent, onComplete]);
+  }, [haptics, saveCurrent, onComplete]);
 
   const canFinish = Object.keys(drawnGlyphs).length > 0 || hasContent;
 

@@ -19,7 +19,8 @@
     "opentype.js": "^1.3.4",
     "perfect-freehand": "^1.2.3",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "web-haptics": "^0.0.6"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

@@ -4,6 +4,7 @@ import { useRef, useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getRandomPangram } from "@/lib/pangrams";
 import CameraCapture from "@/components/CameraCapture";
+import { useAppHaptics } from "@/lib/haptics";
 
 interface PangramCaptureProps {
   onCapture: (file: File | Blob, pangram: string) => void;
@@ -14,12 +15,14 @@ export default function PangramCapture({ onCapture }: PangramCaptureProps) {
   const [preview, setPreview] = useState<string | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const haptics = useAppHaptics();
 
   const shufflePangram = () => {
     let next = getRandomPangram();
     while (next === pangram) {
       next = getRandomPangram();
     }
+    haptics.selection();
     setPangram(next);
   };
 
@@ -28,9 +31,10 @@ export default function PangramCapture({ onCapture }: PangramCaptureProps) {
       if (preview) URL.revokeObjectURL(preview);
       const url = URL.createObjectURL(file);
       setPreview(url);
+      haptics.medium();
       onCapture(file, pangram);
     },
-    [onCapture, pangram, preview]
+    [haptics, onCapture, pangram, preview]
   );
 
   // Cleanup preview URL on unmount
@@ -62,11 +66,18 @@ export default function PangramCapture({ onCapture }: PangramCaptureProps) {
   );
 
   const handleTakePhoto = () => {
+    haptics.medium();
     setCameraActive(true);
   };
 
   const handleCameraClose = () => {
+    haptics.light();
     setCameraActive(false);
+  };
+
+  const handleUploadClick = () => {
+    haptics.medium();
+    fileInputRef.current?.click();
   };
 
   return (
@@ -121,7 +132,10 @@ export default function PangramCapture({ onCapture }: PangramCaptureProps) {
               className="w-full h-full object-cover"
             />
             <button
-              onClick={() => setPreview(null)}
+              onClick={() => {
+                haptics.light();
+                setPreview(null);
+              }}
               className="absolute top-3 right-3 w-8 h-8 rounded-full bg-bg/80 backdrop-blur-sm border border-border flex items-center justify-center text-fg/60 hover:text-fg transition-colors text-sm"
             >
               &times;
@@ -137,7 +151,7 @@ export default function PangramCapture({ onCapture }: PangramCaptureProps) {
             onDragOver={(e) => e.preventDefault()}
             className="w-full aspect-[4/3] rounded-xl border border-dashed border-border-strong flex flex-col items-center justify-center gap-5 cursor-pointer hover:border-fg/30 transition-colors"
             style={{ boxShadow: "var(--shadow-sm)" }}
-            onClick={() => fileInputRef.current?.click()}
+            onClick={handleUploadClick}
           >
             {/* Camera icon */}
             <div className="w-12 h-12 rounded-full border border-border flex items-center justify-center">
@@ -188,7 +202,7 @@ export default function PangramCapture({ onCapture }: PangramCaptureProps) {
             take photo
           </button>
           <button
-            onClick={() => fileInputRef.current?.click()}
+            onClick={handleUploadClick}
             className="px-5 py-2.5 rounded-full bg-fg text-bg text-xs tracking-wide hover:bg-fg/85 transition-colors"
             style={{ boxShadow: "var(--shadow-sm)" }}
           >

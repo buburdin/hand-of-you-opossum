@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { useAppHaptics } from "@/lib/haptics";
 
 type Mode = "snap" | "draw";
 
@@ -10,6 +11,14 @@ interface ModeSelectorProps {
 }
 
 export default function ModeSelector({ mode, onModeChange }: ModeSelectorProps) {
+  const haptics = useAppHaptics();
+
+  const handleModeChange = (nextMode: Mode) => {
+    if (nextMode === mode) return;
+    haptics.selection();
+    onModeChange(nextMode);
+  };
+
   return (
     <div className="relative flex rounded-full border border-border p-0.5 font-mono text-xs tracking-wide"
       style={{ boxShadow: "var(--shadow-sm)" }}
@@ -24,7 +33,7 @@ export default function ModeSelector({ mode, onModeChange }: ModeSelectorProps) 
         }}
       />
       <button
-        onClick={() => onModeChange("draw")}
+        onClick={() => handleModeChange("draw")}
         className={`relative z-10 px-5 py-2 rounded-full transition-colors duration-150 ${
           mode === "draw" ? "text-bg" : "text-fg/50"
         }`}
@@ -32,7 +41,7 @@ export default function ModeSelector({ mode, onModeChange }: ModeSelectorProps) 
         draw letters
       </button>
       <button
-        onClick={() => onModeChange("snap")}
+        onClick={() => handleModeChange("snap")}
         className={`relative z-10 px-5 py-2 rounded-full transition-colors duration-150 ${
           mode === "snap" ? "text-bg" : "text-fg/50"
         }`}

@@ -12,6 +12,7 @@ Turn your handwriting into a font. Snap a photo of a pangram or draw letters on 
 - **opentype.js** — font generation (runs in browser)
 - **perfect-freehand** — smooth stroke rendering for the draw-on-screen mode
 - **html-to-image** — export rendered text as an image
+- **web-haptics** — subtle tactile feedback for mode switches, capture, export, and other key mobile interactions
 - **Tailwind CSS v4**, **Framer Motion** — UI
 
 ## Getting Started

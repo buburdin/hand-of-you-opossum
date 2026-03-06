@@ -18,6 +18,7 @@ import {
 import { loadFont } from "@/lib/fontLoader";
 import { saveSession, loadSession, clearSession, saveDrawProgress, loadDrawProgress, clearDrawProgress } from "@/lib/sessionStore";
 import DebugOverlay from "@/components/DebugOverlay";
+import { useAppHaptics } from "@/lib/haptics";
 
 type Step = "landing" | "input" | "processing" | "playground";
 type Mode = "snap" | "draw";
@@ -37,6 +38,7 @@ export default function Home() {
   const [mounted, setMounted] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const playgroundRef = useRef<TextPlaygroundHandle>(null);
+  const haptics = useAppHaptics();
 
   const collectDebug = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("debug");
 
@@ -75,6 +77,7 @@ export default function Home() {
   }, []);
 
   const handleStart = () => {
+    haptics.medium();
     setStep("input");
     setError(null);
   };
@@ -100,16 +103,18 @@ export default function Home() {
         setCharsFound(result.charsFound);
         clearDrawProgress();
         saveSession(result.ttf, result.charsFound, "snap", result.glyphs, result.referenceHeight);
+        haptics.success();
 
         setTimeout(() => setStep("playground"), 500);
       } catch (err) {
+        haptics.error();
         setError(err instanceof Error ? err.message : "Something went wrong");
         setStep("input");
       } finally {
         clearInterval(stepTimer);
       }
     },
-    []
+    [collectDebug, haptics]
   );
 
   const handleDrawComplete = useCallback(
@@ -132,16 +137,18 @@ export default function Home() {
         setCharsFound(result.charsFound);
         clearDrawProgress();
         saveSession(result.ttf, result.charsFound, "draw", result.glyphs, result.referenceHeight);
+        haptics.success();
 
         setTimeout(() => setStep("playground"), 500);
       } catch (err) {
+        haptics.error();
         setError(err instanceof Error ? err.message : "Something went wrong");
         setStep("input");
       } finally {
         clearInterval(stepTimer);
       }
     },
-    []
+    [haptics]
   );
 
   const handleStartOver = () => {
@@ -293,16 +300,24 @@ export default function Home() {
                 glyphs={fontResult?.glyphs}
                 referenceHeight={fontResult?.referenceHeight}
                 onEditLetters={mode === "draw" ? handleEditLetters : undefined}
-                onExportImage={() => {
+                onExportImage={async () => {
                   const el = playgroundRef.current?.getDisplayElement();
-                  if (el) exportElementAsImage(el).catch(() => {
+                  if (!el) return;
+                  try {
+                    await exportElementAsImage(el);
+                    haptics.success();
+                  } catch {
+                    haptics.error();
                     alert("Failed to save image. Please try again.");
-                  });
+                  }
                 }}
                 onShare={async () => {
                   const el = playgroundRef.current?.getDisplayElement();
                   if (!el) return;
                   const result = await shareSticker(el);
+                  if (result === "shared" || result === "copied") {
+                    haptics.success();
+                  }
                   if (result === "copied") {
                     setToast("image copied to clipboard");
                     setTimeout(() => setToast(null), 2500);

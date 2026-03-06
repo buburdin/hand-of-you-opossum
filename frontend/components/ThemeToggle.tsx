@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useAppHaptics } from "@/lib/haptics";
 
 type Theme = "light" | "night";
 
@@ -37,16 +38,18 @@ function getInitialTheme(): Theme {
 }
 
 export default function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>("light");
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof window === "undefined") return "light";
+    return getInitialTheme();
+  });
   const [mounted, setMounted] = useState(false);
   const hasManualOverride = useRef(false);
+  const haptics = useAppHaptics();
 
   useEffect(() => {
-    setMounted(true);
+    const frame = window.requestAnimationFrame(() => setMounted(true));
     hasManualOverride.current = !!window.localStorage.getItem(OVERRIDE_KEY);
-    const initial = getInitialTheme();
-    setTheme(initial);
-    applyTheme(initial);
+    applyTheme(theme);
 
     const mql = window.matchMedia("(prefers-color-scheme: dark)");
     const handleChange = (e: MediaQueryListEvent) => {
@@ -56,10 +59,14 @@ export default function ThemeToggle() {
       applyTheme(next);
     };
     mql.addEventListener("change", handleChange);
-    return () => mql.removeEventListener("change", handleChange);
-  }, []);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      mql.removeEventListener("change", handleChange);
+    };
+  }, [theme]);
 
   const toggleTheme = useCallback(() => {
+    haptics.light();
     setTheme((prev) => {
       const next: Theme = prev === "night" ? "light" : "night";
       const matchesSystem = next === systemTheme();
@@ -75,9 +82,10 @@ export default function ThemeToggle() {
       applyTheme(next);
       return next;
     });
-  }, []);
+  }, [haptics]);
 
-  const isNight = theme === "night";
+  const renderedTheme: Theme = mounted ? theme : "light";
+  const isNight = renderedTheme === "night";
 
   return (
     <button

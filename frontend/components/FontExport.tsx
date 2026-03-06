@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toPng } from "html-to-image";
 import { getFontEmbedCSS } from "@/lib/fontLoader";
 import { generateFont } from "@/lib/pipeline/fontgen";
 import type { VectorizedGlyph } from "@/lib/pipeline/vectorize";
+import { useAppHaptics } from "@/lib/haptics";
 
 function downloadFile(data: ArrayBuffer, filename: string, mimeType: string) {
   const blob = new Blob([data], { type: mimeType });
@@ -45,8 +46,10 @@ export default function FontExport({
 }: FontExportProps) {
   const [showNameModal, setShowNameModal] = useState(false);
   const [nameInput, setNameInput] = useState("");
-  const [preview, setPreview] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const haptics = useAppHaptics();
+  const sanitizedName = nameInput.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+  const preview = `hand-of-${sanitizedName || "you"}-XXX`;
 
   useEffect(() => {
     if (showNameModal) {
@@ -54,21 +57,20 @@ export default function FontExport({
     }
   }, [showNameModal]);
 
-  useEffect(() => {
-    const sanitized = nameInput.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-    setPreview(`hand-of-${sanitized || "you"}-XXX`);
-  }, [nameInput]);
-
-  const closeModal = useCallback(() => {
+  function dismissModal() {
     setShowNameModal(false);
     setNameInput("");
-  }, []);
+  }
 
-  const doDownload = useCallback(() => {
+  function closeModal() {
+    haptics.light();
+    dismissModal();
+  }
+
+  function doDownload() {
     if (!ttfData) return;
 
-    const sanitized = nameInput.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-    const name = sanitized || "you";
+    const name = sanitizedName || "you";
     const suffix = String(Math.floor(Math.random() * 900) + 100);
     const fontName = `hand-of-${name}-${suffix}`;
 
@@ -78,8 +80,9 @@ export default function FontExport({
     }
 
     downloadFile(data, `${fontName}.ttf`, "font/ttf");
-    closeModal();
-  }, [ttfData, glyphs, referenceHeight, nameInput, closeModal]);
+    haptics.success();
+    dismissModal();
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,7 +108,10 @@ export default function FontExport({
           <div className="flex items-center gap-3">
             {onEditLetters && (
               <button
-                onClick={onEditLetters}
+                onClick={() => {
+                  haptics.selection();
+                  onEditLetters();
+                }}
                 className="px-5 py-3 rounded-full border border-border text-xs tracking-wide hover:border-fg/30 transition-colors"
                 style={{ boxShadow: "var(--shadow-sm)" }}
               >
@@ -120,7 +126,10 @@ export default function FontExport({
               save as image
             </button>
             <button
-              onClick={() => setShowNameModal(true)}
+              onClick={() => {
+                haptics.medium();
+                setShowNameModal(true);
+              }}
               disabled={!ttfData}
               className="px-5 py-3 rounded-full border border-border text-xs tracking-wide hover:border-fg/30 transition-colors disabled:opacity-30"
               style={{ boxShadow: "var(--shadow-sm)" }}

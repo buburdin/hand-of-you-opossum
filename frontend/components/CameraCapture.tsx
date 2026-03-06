@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAppHaptics } from "@/lib/haptics";
 
 type CameraStatus =
   | "initializing"
@@ -26,17 +27,18 @@ export default function CameraCapture({
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const [status, setStatus] = useState<CameraStatus>("initializing");
+  const [status, setStatus] = useState<CameraStatus>(() => {
+    if (typeof navigator === "undefined") return "initializing";
+    return navigator.mediaDevices?.getUserMedia ? "initializing" : "not-supported";
+  });
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null);
   const [flash, setFlash] = useState(false);
+  const haptics = useAppHaptics();
 
   // Initialize camera stream
   useEffect(() => {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setStatus("not-supported");
-      return;
-    }
+    if (status === "not-supported") return;
 
     let cancelled = false;
 
@@ -83,7 +85,7 @@ export default function CameraCapture({
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     };
-  }, []);
+  }, [status]);
 
   // Cleanup preview URL on unmount
   useEffect(() => {
@@ -96,6 +98,8 @@ export default function CameraCapture({
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
+
+    haptics.medium();
 
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
@@ -118,9 +122,10 @@ export default function CameraCapture({
       "image/jpeg",
       0.80
     );
-  }, []);
+  }, [haptics]);
 
   const handleRetake = useCallback(async () => {
+    haptics.light();
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
     setCapturedBlob(null);
@@ -146,15 +151,16 @@ export default function CameraCapture({
     } catch {
       setStatus("error");
     }
-  }, [previewUrl]);
+  }, [haptics, previewUrl]);
 
   const handleUse = useCallback(() => {
     if (!capturedBlob) return;
+    haptics.medium();
     const file = new File([capturedBlob], `capture-${Date.now()}.jpg`, {
       type: "image/jpeg",
     });
     onCapture(file);
-  }, [capturedBlob, onCapture]);
+  }, [capturedBlob, haptics, onCapture]);
 
   const isError =
     status === "denied" ||
@@ -266,7 +272,10 @@ export default function CameraCapture({
 
         {/* Close button (always visible) */}
         <button
-          onClick={onClose}
+          onClick={() => {
+            haptics.light();
+            onClose();
+          }}
           className="absolute top-3 right-3 w-8 h-8 rounded-full bg-bg/80 backdrop-blur-sm border border-border flex items-center justify-center text-fg/60 hover:text-fg transition-colors text-sm"
         >
           &times;
