@@ -397,7 +397,7 @@ export default function DrawCanvas({ onComplete, initialGlyphs, onGlyphsChange }
         {/* Guide letter (faint) — hides on first stroke */}
         {!hasContent && (
           <span
-            className="absolute pointer-events-none select-none font-medium text-ink/[0.04]"
+            className="absolute pointer-events-none select-none font-medium text-ink/[0.07]"
             style={{
               fontSize: GHOST_FONT_SIZE,
               lineHeight: 1,
