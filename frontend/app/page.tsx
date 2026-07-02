@@ -2,7 +2,9 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import ModeSelector from "@/components/ModeSelector";
+// ModeSelector (draw/snap slider) temporarily hidden to save vertical space on the input screen.
+// Restore this import together with its usage in the input step below.
+// import ModeSelector from "@/components/ModeSelector";
 import PangramCapture from "@/components/PangramCapture";
 import DrawCanvas from "@/components/DrawCanvas";
 import ProcessingAnimation from "@/components/ProcessingAnimation";
@@ -246,7 +248,8 @@ export default function Home() {
               transition={spring}
               className="flex flex-col items-center gap-8 w-full"
             >
-              <ModeSelector mode={mode} onModeChange={setMode} />
+              {/* Slider (ModeSelector) temporarily hidden to save vertical space — code kept for restore. */}
+              {/* <ModeSelector mode={mode} onModeChange={setMode} /> */}
 
               {error && (
                 <motion.div
@@ -355,9 +358,9 @@ export default function Home() {
           </motion.a>
         )}
         <div className="text-sm font-medium lowercase tracking-tight">
-          <a href="https://x.com/buburdin" target="_blank" rel="noopener noreferrer" className="hover:opacity-60 transition-opacity">Alex Burdin</a>
+          <a href="https://x.com/buburdin" target="_blank" rel="noopener noreferrer" className="hover:opacity-60 transition-opacity">alex burdin</a>
           {" & "}
-          <a href="https://x.com/maxyugio" target="_blank" rel="noopener noreferrer" className="hover:opacity-60 transition-opacity">Max Yugi</a>
+          <a href="https://antonherasymenko.com" target="_blank" rel="noopener noreferrer" className="hover:opacity-60 transition-opacity">anton herasymenko</a>
         </div>
       </footer>
 
