@@ -94,6 +94,33 @@ body {
   transition: background-color 200ms ease, color 200ms ease;
 }
 
+.nyt-feature-card {
+  box-shadow: none;
+  transition: box-shadow 450ms cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 200ms ease;
+  will-change: transform;
+}
+
+.nyt-feature-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+}
+
+.nyt-logo {
+  opacity: 0.9;
+  transition: filter 200ms ease, opacity 200ms ease;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .nyt-logo {
+    filter: invert(1);
+  }
+}
+
+html[data-theme="night"] .nyt-logo {
+  filter: invert(1);
+}
+
 /* Custom scrollbar - minimal */
 ::-webkit-scrollbar {
   width: 4px;

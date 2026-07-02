@@ -225,12 +225,34 @@ export default function Home() {
                 make your font
               </motion.button>
 
-              <div className="flex gap-6 text-[10px] uppercase tracking-[0.2em] text-fg/25">
-                <span>free</span>
-                <span>&middot;</span>
-                <span>no signup</span>
-                <span>&middot;</span>
-                <span>instant</span>
+              <div className="flex flex-col items-center gap-10">
+                <div className="flex gap-6 text-[10px] uppercase tracking-[0.2em] text-fg/45">
+                  <span>free</span>
+                  <span>&middot;</span>
+                  <span>no signup</span>
+                  <span>&middot;</span>
+                  <span>instant</span>
+                </div>
+
+                <motion.a
+                  href="https://www.nytimes.com/2026/07/01/briefing/the-good-list-ram-dass-handwriting.html"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Read about Hand of You in The New York Times"
+                  className="nyt-feature-card rounded-[14px] border border-border bg-surface/75 px-6 py-3 normal-case tracking-normal"
+                  whileHover={{ y: -2 }}
+                  whileTap={{ y: -1 }}
+                  transition={{ duration: 0.16, ease: [0.2, 0, 0, 1] }}
+                >
+                  <span className="mb-1 block text-center text-[10px] uppercase tracking-[0.2em] text-fg/45">
+                    featured in
+                  </span>
+                  <img
+                    src="/nyt-logo.svg"
+                    alt="The New York Times"
+                    className="nyt-logo h-auto w-[182px] max-w-[58vw]"
+                  />
+                </motion.a>
               </div>
             </motion.div>
           )}
@@ -331,10 +353,12 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="mt-16 text-[9px] uppercase tracking-[0.3em] text-fg">
-        <a href="https://x.com/buburdin" target="_blank" rel="noopener noreferrer" className="hover:opacity-60 transition-opacity">Alex Burdin</a>
-        {" & "}
-        <a href="https://x.com/maxyugio" target="_blank" rel="noopener noreferrer" className="hover:opacity-60 transition-opacity">Max Yugi</a>
+      <footer className="mt-16 flex flex-col items-center gap-7 text-[9px] uppercase tracking-[0.3em] text-fg">
+        <div className="text-sm font-medium lowercase tracking-tight">
+          <a href="https://x.com/buburdin" target="_blank" rel="noopener noreferrer" className="hover:opacity-60 transition-opacity">Alex Burdin</a>
+          {" & "}
+          <a href="https://x.com/maxyugio" target="_blank" rel="noopener noreferrer" className="hover:opacity-60 transition-opacity">Max Yugi</a>
+        </div>
       </footer>
 
       {/* Toast */}
