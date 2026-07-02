@@ -39,15 +39,10 @@ const NOTE_COLORS: NoteColor[] = [
   { id: "blue",   bg: "#d4eaff", mid: "#c4dffb", end: "#b4d4f7", swatch: "#c4dffa" },
 ];
 
-function pickRandom<T>(arr: T[], count: number): T[] {
-  const shuffled = [...arr].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, count);
-}
-
 const TextPlayground = forwardRef<TextPlaygroundHandle, TextPlaygroundProps>(
   function TextPlayground({ fontLoaded }, ref) {
   const saved = useMemo(() => loadPlayground(), []);
-  const [text, setText] = useState(saved?.text ?? ROTATING_TEXTS[Math.floor(Math.random() * ROTATING_TEXTS.length)]);
+  const [text, setText] = useState(saved?.text ?? ROTATING_TEXTS[0]);
   const [fontSize, setFontSize] = useState(saved?.fontSize ?? 64);
   const [noteColor, setNoteColor] = useState<NoteColor>(
     NOTE_COLORS.find((c) => c.id === saved?.noteColorId) ?? NOTE_COLORS[0],
@@ -58,7 +53,6 @@ const TextPlayground = forwardRef<TextPlaygroundHandle, TextPlaygroundProps>(
     savePlayground({ text, fontSize, noteColorId: noteColor.id });
   }, [text, fontSize, noteColor]);
   const fontFamily = getFontFamilyName();
-  const sampleTexts = useMemo(() => [...pickRandom(ROTATING_TEXTS, 3), "abcdefghijklmnopqrstuvwxyz"], []);
 
   useImperativeHandle(ref, () => ({
     getDisplayElement: () => textDisplayRef.current,
@@ -105,7 +99,7 @@ const TextPlayground = forwardRef<TextPlaygroundHandle, TextPlaygroundProps>(
             fontFamily: fontLoaded ? `"${fontFamily}", sans-serif` : "inherit",
             fontSize: `${fontSize}px`,
             lineHeight: 1.0,
-            wordSpacing: "0.4em",
+            wordSpacing: "20px",
           }}
         />
         {fontLoaded && (

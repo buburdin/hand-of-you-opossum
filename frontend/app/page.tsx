@@ -37,6 +37,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [showLandingFooter, setShowLandingFooter] = useState(true);
   const playgroundRef = useRef<TextPlaygroundHandle>(null);
   const haptics = useAppHaptics();
 
@@ -153,6 +154,7 @@ export default function Home() {
 
   const handleStartOver = () => {
     clearSession();
+    setShowLandingFooter(true);
     setStep("landing");
     setFontResult(null);
     setFontLoaded(false);
@@ -192,7 +194,12 @@ export default function Home() {
 
       {/* Main content */}
       <main className="flex-1 w-full max-w-2xl flex flex-col items-center">
-        <AnimatePresence mode="wait">
+        <AnimatePresence
+          mode="wait"
+          onExitComplete={() => {
+            if (step !== "landing") setShowLandingFooter(false);
+          }}
+        >
           {/* Landing */}
           {step === "landing" && (
             <motion.div
@@ -210,8 +217,9 @@ export default function Home() {
                   into a font
                 </h1>
                 <p className="text-sm text-fg/45 max-w-sm mx-auto leading-relaxed">
-                  snap a photo of your handwriting or draw letters on screen.
-                  we&apos;ll make a font file you can use anywhere.
+                  draw your letters on screen, or snap a photo of your
+                  handwriting. we&apos;ll turn it into a free font file you can
+                  use anywhere.
                 </p>
               </div>
 
@@ -225,35 +233,6 @@ export default function Home() {
                 make your font
               </motion.button>
 
-              <div className="flex flex-col items-center gap-10">
-                <div className="flex gap-6 text-[10px] uppercase tracking-[0.2em] text-fg/45">
-                  <span>free</span>
-                  <span>&middot;</span>
-                  <span>no signup</span>
-                  <span>&middot;</span>
-                  <span>instant</span>
-                </div>
-
-                <motion.a
-                  href="https://www.nytimes.com/2026/07/01/briefing/the-good-list-ram-dass-handwriting.html"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Read about Hand of You in The New York Times"
-                  className="nyt-feature-card rounded-[14px] border border-border bg-surface/75 px-4 py-2.5 normal-case tracking-normal sm:px-5 sm:py-3"
-                  whileHover={{ y: -2 }}
-                  whileTap={{ y: -1 }}
-                  transition={{ duration: 0.16, ease: [0.2, 0, 0, 1] }}
-                >
-                  <span className="mb-1 block text-center text-[9px] uppercase tracking-[0.2em] text-fg/45 sm:text-[10px]">
-                    featured in
-                  </span>
-                  <img
-                    src="/nyt-logo.svg"
-                    alt="The New York Times"
-                    className="nyt-logo h-auto w-[170px] max-w-[58vw] sm:w-[182px]"
-                  />
-                </motion.a>
-              </div>
             </motion.div>
           )}
 
@@ -353,7 +332,28 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="mt-16 flex flex-col items-center gap-7 text-[9px] uppercase tracking-[0.3em] text-fg">
+      <footer className="mt-16 flex flex-col items-center gap-14 text-[9px] uppercase tracking-[0.3em] text-fg">
+        {showLandingFooter && (
+          <motion.a
+            href="https://www.nytimes.com/2026/07/01/briefing/the-good-list-ram-dass-handwriting.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Read about Hand of You in The New York Times"
+            className="nyt-feature-card rounded-[14px] border border-border bg-surface/75 px-4 py-2.5 normal-case tracking-normal sm:px-5 sm:py-3"
+            whileHover={{ y: -2 }}
+            whileTap={{ y: -1 }}
+            transition={{ duration: 0.16, ease: [0.2, 0, 0, 1] }}
+          >
+            <span className="mb-1 block text-center text-[9px] uppercase tracking-[0.2em] text-fg/45 sm:text-[10px]">
+              featured in
+            </span>
+            <img
+              src="/nyt-logo.svg"
+              alt="The New York Times"
+              className="nyt-logo h-auto w-[170px] max-w-[58vw] sm:w-[182px]"
+            />
+          </motion.a>
+        )}
         <div className="text-sm font-medium lowercase tracking-tight">
           <a href="https://x.com/buburdin" target="_blank" rel="noopener noreferrer" className="hover:opacity-60 transition-opacity">Alex Burdin</a>
           {" & "}
