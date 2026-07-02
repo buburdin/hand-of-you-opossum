@@ -24,14 +24,14 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: "Hand of You — turn your handwriting into a font",
-    description: "snap a photo or draw letters. instant font, no signup.",
+    description: "draw letters. get instant font.",
     images: [{ url: "/og.png", width: 1200, height: 630, alt: "Hand of You" }],
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
     title: "Hand of You — turn your handwriting into a font",
-    description: "snap a photo or draw letters. instant font, no signup.",
+    description: "draw letters. get instant font.",
     images: ["/og.png"],
   },
   appleWebApp: {

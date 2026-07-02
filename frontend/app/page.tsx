@@ -219,9 +219,8 @@ export default function Home() {
                   into a font
                 </h1>
                 <p className="text-sm text-fg/45 max-w-sm mx-auto leading-relaxed">
-                  draw your letters on screen, or snap a photo of your
-                  handwriting. we&apos;ll turn it into a free font file you can
-                  use anywhere.
+                  draw your letters on screen and we&apos;ll turn it into a free
+                  font file you can use anywhere.
                 </p>
               </div>
 
