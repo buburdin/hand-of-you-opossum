@@ -239,18 +239,18 @@ export default function Home() {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="Read about Hand of You in The New York Times"
-                  className="nyt-feature-card rounded-[14px] border border-border bg-surface/75 px-6 py-3 normal-case tracking-normal"
+                  className="nyt-feature-card rounded-[14px] border border-border bg-surface/75 px-4 py-2.5 normal-case tracking-normal sm:px-5 sm:py-3"
                   whileHover={{ y: -2 }}
                   whileTap={{ y: -1 }}
                   transition={{ duration: 0.16, ease: [0.2, 0, 0, 1] }}
                 >
-                  <span className="mb-1 block text-center text-[10px] uppercase tracking-[0.2em] text-fg/45">
+                  <span className="mb-1 block text-center text-[9px] uppercase tracking-[0.2em] text-fg/45 sm:text-[10px]">
                     featured in
                   </span>
                   <img
                     src="/nyt-logo.svg"
                     alt="The New York Times"
-                    className="nyt-logo h-auto w-[182px] max-w-[58vw]"
+                    className="nyt-logo h-auto w-[170px] max-w-[58vw] sm:w-[182px]"
                   />
                 </motion.a>
               </div>
