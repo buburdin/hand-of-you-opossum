@@ -366,7 +366,7 @@ export default function DrawCanvas({ onComplete, initialGlyphs, onGlyphsChange }
       className="flex flex-col items-center gap-6 w-full max-w-lg mx-auto"
     >
       {/* Letter label */}
-      <p className="text-[10px] uppercase tracking-[0.2em] text-fg/35">
+      <p className="text-[10px] uppercase tracking-[0.2em] text-fg/40">
         draw this letter
       </p>
 
@@ -474,7 +474,7 @@ export default function DrawCanvas({ onComplete, initialGlyphs, onGlyphsChange }
                 ? "bg-fg text-bg"
                 : letter in drawnGlyphs
                 ? "bg-fg/10 text-fg/60"
-                : "bg-transparent text-fg/20"
+                : "bg-transparent text-fg/45"
             }`}
             whileHover={{ scale: 1.15 }}
             whileTap={{ scale: 0.95 }}

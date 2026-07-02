@@ -213,6 +213,20 @@ describe("generateFont", () => {
     expect(parsed.glyphs.length).toBe(54);
   });
 
+  it("includes symbol glyphs in the exported font", () => {
+    const result = generateFont({
+      "@": makeSquareGlyph(),
+    });
+
+    expect(result.charsFound).toContain("@");
+
+    const parsed = opentype.parse(result.ttf);
+    const atGlyph = parsed.charToGlyph("@");
+    expect(atGlyph).toBeTruthy();
+    expect(atGlyph.name).not.toBe(".notdef");
+    expect(atGlyph.unicode).toBe("@".charCodeAt(0));
+  });
+
   it("throws when no valid glyphs are provided", () => {
     expect(() => generateFont({})).toThrow("No valid glyphs");
   });
